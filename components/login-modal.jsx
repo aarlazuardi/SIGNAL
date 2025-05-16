@@ -84,11 +84,11 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Akun SIGNAL</DialogTitle>
-          <DialogDescription>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-[90vw] sm:max-w-[425px] p-4 sm:p-6">
+        <DialogHeader className="mb-4 sm:mb-6">
+          <DialogTitle className="text-xl sm:text-2xl">Akun SIGNAL</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Masuk atau daftar untuk mengakses semua fitur SIGNAL.
           </DialogDescription>
         </DialogHeader>
@@ -96,31 +96,43 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
           defaultValue="login"
           value={activeTab}
           onTabChange={setActiveTab}
+          className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="register">Daftar</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-2 sm:mb-4">
+            <TabsTrigger value="login" className="text-sm">
+              Login
+            </TabsTrigger>
+            <TabsTrigger value="register" className="text-sm">
+              Daftar
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="login">
-            <form onSubmit={handleLogin} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+            <form
+              onSubmit={handleLogin}
+              className="space-y-3 sm:space-y-4 py-2 sm:py-4"
+            >
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="email" className="text-sm">
+                  Email
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="nama@contoh.com"
-                    className="pl-10"
+                    className="pl-10 text-sm h-9 sm:h-10"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     required
                   />
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1 sm:space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="text-sm">
+                    Password
+                  </Label>
                   <Button
                     variant="link"
                     className="h-auto p-0 text-xs text-emerald-600"
@@ -129,12 +141,12 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
                   </Button>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-2.5 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    className="pl-10"
+                    className="pl-10 text-sm h-9 sm:h-10"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
@@ -145,9 +157,9 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
                     className="absolute right-3 top-2.5 text-muted-foreground"
                   >
                     {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
+                      <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
                     ) : (
-                      <Eye className="h-5 w-5" />
+                      <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                     )}
                     <span className="sr-only">
                       {showPassword
@@ -184,46 +196,55 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
             </form>
           </TabsContent>
           <TabsContent value="register">
-            <form onSubmit={handleRegister} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nama Lengkap</Label>
+            <form
+              onSubmit={handleRegister}
+              className="space-y-3 sm:space-y-4 py-2 sm:py-4"
+            >
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="name" className="text-sm">
+                  Nama Lengkap
+                </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                  <User className="absolute left-3 top-2.5 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   <Input
                     id="name"
                     type="text"
                     placeholder="Nama Lengkap"
-                    className="pl-10"
+                    className="pl-10 text-sm h-9 sm:h-10"
                     value={registerName}
                     onChange={(e) => setRegisterName(e.target.value)}
                     required
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-email">Email</Label>
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="register-email" className="text-sm">
+                  Email
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   <Input
                     id="register-email"
                     type="email"
                     placeholder="nama@contoh.com"
-                    className="pl-10"
+                    className="pl-10 text-sm h-9 sm:h-10"
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
                     required
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-password">Password</Label>
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="register-password" className="text-sm">
+                  Password
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-2.5 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   <Input
                     id="register-password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Password"
-                    className="pl-10"
+                    className="pl-10 text-sm h-9 sm:h-10"
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     required
@@ -234,25 +255,29 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
                     className="absolute right-3 top-2.5 text-muted-foreground"
                   >
                     {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
+                      <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
                     ) : (
-                      <Eye className="h-5 w-5" />
+                      <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                     )}
                     <span className="sr-only">
-                      {showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                      {showPassword
+                        ? "Sembunyikan password"
+                        : "Tampilkan password"}
                     </span>
                   </button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-password-confirm">Konfirmasi Password</Label>
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="register-password-confirm" className="text-sm">
+                  Konfirmasi Password
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-2.5 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   <Input
                     id="register-password-confirm"
                     type={showPassword ? "text" : "password"}
                     placeholder="Konfirmasi password"
-                    className="pl-10"
+                    className="pl-10 text-sm h-9 sm:h-10"
                     value={registerPasswordConfirm}
                     onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
                     required
@@ -263,18 +288,23 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
                     className="absolute right-3 top-2.5 text-muted-foreground"
                   >
                     {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
+                      <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
                     ) : (
-                      <Eye className="h-5 w-5" />
+                      <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                     )}
                     <span className="sr-only">
-                      {showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                      {showPassword
+                        ? "Sembunyikan password"
+                        : "Tampilkan password"}
                     </span>
                   </button>
                 </div>
-                {registerPasswordConfirm && registerPassword !== registerPasswordConfirm && (
-                  <div className="text-sm text-red-500">Password tidak sama</div>
-                )}
+                {registerPasswordConfirm &&
+                  registerPassword !== registerPasswordConfirm && (
+                    <div className="text-sm text-red-500">
+                      Password tidak sama
+                    </div>
+                  )}
               </div>
               {registerError && (
                 <div className="text-sm text-red-500">{registerError}</div>
@@ -282,7 +312,9 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
               <Button
                 type="submit"
                 className="w-full bg-emerald-600 hover:bg-emerald-700"
-                disabled={isRegistering || registerPassword !== registerPasswordConfirm}
+                disabled={
+                  isRegistering || registerPassword !== registerPasswordConfirm
+                }
               >
                 {isRegistering ? "Memproses..." : "Daftar"}
               </Button>

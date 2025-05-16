@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./theme-toggle";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "./ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Menu, X, Shield, LogIn, LogOut, User } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import LoginModal from "./login-modal";
@@ -43,14 +43,16 @@ export default function Navbar() {
     }
     return true;
   };
-  return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center px-3 sm:px-4 md:px-6">
+
+  return (    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 sm:h-16 items-center px-3 sm:px-4 md:px-6">
         {/* Logo */}
-        <Link href="/" className="inline-flex items-center gap-1 sm:gap-2">
-          <Shield className="h-[1.2rem] w-[1.2rem] text-emerald-600" />
-          <span className="text-lg font-bold leading-none">SIGNAL</span>
-        </Link>
+        <div className="flex items-center">
+          <div className="inline-flex items-center gap-1 sm:gap-2">
+            <Shield className="h-[1.2rem] w-[1.2rem] text-emerald-600" />
+            <span className="text-lg font-bold leading-none">SIGNAL</span>
+          </div>
+        </div>
 
         {/* Desktop Navigation - Hidden on mobile */}
         <nav className="hidden md:flex items-center mx-6 lg:mx-10 flex-1">
@@ -82,11 +84,10 @@ export default function Navbar() {
               );
             })}
           </ul>
-        </nav>
-
-        {/* Right Side Actions */}
+        </nav>        {/* Right Side Actions - For Both Mobile and Desktop */}
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
+          
           {/* User Menu - Hidden on Mobile */}
           <div className="hidden md:flex items-center">
             {isAuthenticated ? (
@@ -94,10 +95,10 @@ export default function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="inline-flex items-center gap-2 h-9 px-3"
+                    className="flex items-center gap-2 h-9 px-3"
                   >
                     <User className="h-[1.2rem] w-[1.2rem]" />
-                    <span className="hidden sm:inline-block text-sm leading-none">
+                    <span className="hidden sm:inline-block text-sm">
                       {user?.name || "User"}
                     </span>
                   </Button>
@@ -119,62 +120,58 @@ export default function Navbar() {
             ) : (
               <Button
                 variant="default"
-                className="bg-emerald-600 hover:bg-emerald-700 h-9 text-sm px-3 inline-flex items-center"
+                className="bg-emerald-600 hover:bg-emerald-700 h-9 text-sm px-3"
                 onClick={() => setShowLoginModal(true)}
               >
                 <LogIn className="mr-2 h-[1.2rem] w-[1.2rem]" />
-                <span className="leading-none">Login</span>
+                Login
               </Button>
-            )}
-          </div>{" "}
-          {/* Mobile Menu Button */}
+            )
+          </div>
+
+          {/* Mobile Menu Button - Visible only on Mobile */}
           <div className="md:hidden flex items-center">
             <Sheet open={showMobileMenu} onOpenChange={setShowMobileMenu}>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 p-0 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 inline-flex items-center justify-center"
+                  className="h-9 w-9 p-0 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
                   aria-label="Buka menu navigasi"
                   aria-expanded={showMobileMenu}
                 >
-                  <Menu className="h-[1.2rem] w-[1.2rem]" />
+                  <Menu className="h-5 w-5" />
                   <span className="sr-only">Menu</span>
                 </Button>
-              </SheetTrigger>{" "}
+              </SheetTrigger>
               <SheetContent
                 side="right"
                 className="w-[85vw] max-w-[280px] sm:max-w-[320px] p-0"
               >
-                <SheetTitle className="sr-only">Menu Navigasi</SheetTitle>
                 <div className="flex items-center justify-between h-14 px-4 border-b">
-                  <div className="inline-flex items-center gap-1.5">
-                    <Shield className="h-[1.2rem] w-[1.2rem] text-emerald-600" />
-                    <Link
-                      href="/"
-                      className="text-lg font-bold leading-none"
-                      onClick={() => setShowMobileMenu(false)}
-                    >
+                  <div className="flex items-center gap-1.5">
+                    <Shield className="h-5 w-5 text-emerald-600" />
+                    <Link href="/" className="text-lg font-bold" onClick={() => setShowMobileMenu(false)}>
                       SIGNAL
                     </Link>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 p-0 ml-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 inline-flex items-center justify-center"
+                    className="h-8 w-8 p-0 ml-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
                     aria-label="Tutup menu"
                     onClick={() => setShowMobileMenu(false)}
                   >
-                    <X className="h-[1.2rem] w-[1.2rem]" />
+                    <X className="h-5 w-5" />
                     <span className="sr-only">Tutup</span>
                   </Button>
                 </div>
                 <nav className="px-4 py-4">
-                  <ul className="flex flex-col space-y-3">
+                  <ul className="flex flex-col space-y-4">
                     {navigation.map((item) => {
                       const isActive = pathname === item.href;
                       return (
-                        <li key={item.name} className="py-0.5">
+                        <li key={item.name} className="py-1">
                           {item.requiresAuth && !isAuthenticated ? (
                             <button
                               onClick={() => {
@@ -206,16 +203,16 @@ export default function Navbar() {
                       );
                     })}
                   </ul>
-                  <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-800">
+                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
                     {isAuthenticated ? (
                       <>
-                        <div className="mb-4 inline-flex items-center gap-2">
-                          <User className="h-[1.2rem] w-[1.2rem] text-muted-foreground" />
-                          <span className="text-base leading-none">
+                        <div className="mb-4 flex items-center gap-2">
+                          <User className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-base">
                             {user?.name || "User"}
                           </span>
                         </div>
-                        <div className="flex flex-col space-y-2.5">
+                        <div className="flex flex-col space-y-3">
                           <Button
                             variant="outline"
                             className="h-10 text-base justify-start"
@@ -242,27 +239,27 @@ export default function Navbar() {
                           </Button>
                           <Button
                             variant="destructive"
-                            className="h-10 text-base mt-2 inline-flex items-center"
+                            className="h-10 text-base mt-2"
                             onClick={() => {
                               logout();
                               setShowMobileMenu(false);
                             }}
                           >
-                            <LogOut className="mr-2 h-[1.2rem] w-[1.2rem]" />
-                            <span className="leading-none">Keluar</span>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Keluar
                           </Button>
                         </div>
                       </>
                     ) : (
                       <Button
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 h-10 text-base inline-flex items-center"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 h-10 text-base"
                         onClick={() => {
                           setShowMobileMenu(false);
                           setShowLoginModal(true);
                         }}
                       >
-                        <LogIn className="mr-2 h-[1.2rem] w-[1.2rem]" />
-                        <span className="leading-none">Login</span>
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Login
                       </Button>
                     )}
                   </div>

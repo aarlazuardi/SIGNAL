@@ -52,52 +52,63 @@ export default function VerificationPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="container flex h-16 items-center px-4">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
+        <div className="container flex h-14 sm:h-16 items-center px-3 sm:px-4 md:px-6">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Link href="/">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 sm:h-9 sm:w-9"
+                aria-label="Kembali ke beranda"
+              >
+                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="sr-only">Kembali</span>
               </Button>
             </Link>
-            <h1 className="text-xl font-bold">Verifikasi Tanda Tangan</h1>
+            <h1 className="text-lg sm:text-xl font-bold">
+              Verifikasi Tanda Tangan
+            </h1>
           </div>
         </div>
       </header>
 
-      <main className="container px-4 py-8">
-        <div className="mx-auto max-w-3xl space-y-8">
+      <main className="container px-3 sm:px-4 md:px-6 py-6 sm:py-8">
+        <div className="mx-auto max-w-3xl space-y-6 sm:space-y-8">
           <Card>
-            <CardContent className="p-6">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="file">Unggah Dokumen Jurnal</Label>
-                  <div className="flex items-center gap-2">
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-4 sm:space-y-6">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="file" className="text-sm sm:text-base">
+                    Unggah Dokumen Jurnal
+                  </Label>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                     <Input
                       id="file"
                       type="file"
                       accept=".pdf,.doc,.docx,.txt"
                       onChange={handleFileChange}
-                      className="flex-1"
+                      className="flex-1 text-sm h-9 sm:h-10"
                     />
                     <Button
                       variant="outline"
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 text-xs sm:text-sm h-9 sm:h-10 w-full sm:w-auto"
                       onClick={() => document.getElementById("file").click()}
                     >
-                      <Upload className="h-4 w-4" />
+                      <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       <span>Pilih File</span>
                     </Button>
                   </div>
                   {file && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                       File dipilih: {file.name}
                     </p>
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="publicKey">Kunci Publik</Label>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="publicKey" className="text-sm sm:text-base">
+                    Kunci Publik
+                  </Label>
                   <Textarea
                     id="publicKey"
                     value={publicKey}
@@ -108,7 +119,7 @@ export default function VerificationPage() {
                 </div>
 
                 <Button
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 h-10 sm:h-11"
                   onClick={handleVerify}
                   disabled={!file || !publicKey || verifying}
                 >
@@ -132,14 +143,16 @@ export default function VerificationPage() {
               ) : (
                 <XCircle className="h-5 w-5" />
               )}
-              <AlertTitle>
+              <AlertTitle className="text-base sm:text-lg">
                 {verificationResult.valid
                   ? "Verifikasi Berhasil"
                   : "Verifikasi Gagal"}
               </AlertTitle>
               <AlertDescription className="mt-2 space-y-2">
-                <p>{verificationResult.message}</p>
-                <div className="mt-4 space-y-1 text-sm">
+                <p className="text-sm sm:text-base">
+                  {verificationResult.message}
+                </p>
+                <div className="mt-4 space-y-1 text-xs sm:text-sm">
                   <p>
                     <strong>Dokumen:</strong> {verificationResult.documentName}
                   </p>
@@ -154,12 +167,12 @@ export default function VerificationPage() {
             </Alert>
           )}
 
-          <div className="rounded-lg border bg-card p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-lg font-medium">
-              <FileText className="h-5 w-5 text-emerald-600" />
+          <div className="rounded-lg border bg-card p-4 sm:p-6">
+            <h3 className="mb-3 sm:mb-4 flex items-center gap-2 text-base sm:text-lg font-medium">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
               Cara Verifikasi Tanda Tangan Digital
             </h3>
-            <ol className="ml-6 list-decimal space-y-2 text-muted-foreground">
+            <ol className="ml-5 sm:ml-6 list-decimal space-y-1.5 sm:space-y-2 text-sm sm:text-base text-muted-foreground">
               <li>
                 Unggah dokumen jurnal yang ingin diverifikasi tanda tangannya.
               </li>

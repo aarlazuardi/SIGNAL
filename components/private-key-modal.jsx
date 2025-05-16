@@ -98,11 +98,7 @@ export default function PrivateKeyModal({ isOpen, onClose, onSign, title }) {
           </AlertDescription>
         </Alert>
 
-        <Tabs
-          defaultValue="input"
-          value={activeTab}
-          onValueChange={setActiveTab}
-        >
+        <Tabs defaultValue="input" value={activeTab} onTabChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="input">Input Manual</TabsTrigger>
             <TabsTrigger value="file">Upload File</TabsTrigger>
