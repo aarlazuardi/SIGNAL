@@ -16,6 +16,7 @@ import { Label } from "./ui/label";
 import { useAuth } from "./auth-provider";
 import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
+import { signIn } from "next-auth/react";
 
 export default function LoginModal({ isOpen, onClose, redirectPath }) {
   const [activeTab, setActiveTab] = useState("login");
@@ -36,14 +37,16 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
   const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState("");
   const [registerError, setRegisterError] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
-
-  const handleGoogleLogin = (e) => {
+  const handleGoogleLogin = async (e) => {
     e.preventDefault();
-    // Mock Google login logic
-    alert("Google login (mocked)");
-    onClose();
-    if (redirectPath) {
-      router.push(redirectPath);
+    try {
+      const result = await signIn("google", {
+        callbackUrl: redirectPath || "/dashboard",
+        redirect: true,
+      });
+      // The redirect will happen automatically, no need to handle it here
+    } catch (error) {
+      console.error("Google login error:", error);
     }
   };
 
