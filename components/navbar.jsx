@@ -31,7 +31,7 @@ export default function Navbar() {
   const navigation = [
     { name: "Beranda", href: "/" },
     { name: "Buat Jurnal", href: "/create", requiresAuth: true },
-    { name: "Ekspor Jurnal", href: "/export", requiresAuth: true },
+    { name: "Unggah Jurnal", href: "/export", requiresAuth: true },
     { name: "Verifikasi", href: "/verify" },
     { name: "Tentang", href: "/about" },
   ];
