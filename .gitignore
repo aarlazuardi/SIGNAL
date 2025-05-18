@@ -35,3 +35,9 @@ prisma/dev.db-journal
 # local files
 *.new
 *.backup
+
+# local documentation
+RUNNING.md
+GOOGLE_OAUTH_SETUP.md
+api-docs.md
+docs/
