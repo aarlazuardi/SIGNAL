@@ -2,8 +2,8 @@
  * API Handler untuk verifikasi tanda tangan digital
  */
 import { NextResponse } from "next/server";
-import { verifySignature } from "../../../../../lib/crypto/ecdsa";
-import prisma from "../../../../../lib/db/prisma";
+import { verifySignature } from "@/lib/crypto/ecdsa";
+import prisma from "@/lib/db/prisma";
 
 export async function POST(request) {
   try {

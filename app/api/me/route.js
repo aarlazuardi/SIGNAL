@@ -2,7 +2,7 @@
  * API Handler untuk mendapatkan informasi user saat ini
  */
 import { NextResponse } from "next/server";
-import { getUserFromToken } from "../../../../middleware/auth";
+import { getUserFromToken } from "@/middleware/auth";
 
 export async function GET(request) {
   try {

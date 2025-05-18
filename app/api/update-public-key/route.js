@@ -2,8 +2,8 @@
  * API Handler untuk memperbarui kunci publik user
  */
 import { NextResponse } from "next/server";
-import { getUserFromToken } from "../../../../middleware/auth";
-import { validatePublicKey } from "../../../../lib/crypto/ecdsa";
+import { getUserFromToken } from "@/middleware/auth";
+import { validatePublicKey } from "@/lib/crypto/ecdsa";
 
 export async function POST(request) {
   try {

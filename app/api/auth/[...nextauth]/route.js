@@ -3,7 +3,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import prisma from "../../../../../lib/db/prisma";
+import prisma from "@/lib/db/prisma";
 
 /**
  * Konfigurasi NextAuth untuk autentikasi

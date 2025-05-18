@@ -2,8 +2,8 @@
  * API Handler untuk mengekspor jurnal sebagai PDF
  */
 import { NextResponse } from "next/server";
-import { getUserFromToken } from "../../../../../middleware/auth";
-import prisma from "../../../../../lib/db/prisma";
+import { getUserFromToken } from "@/middleware/auth";
+import prisma from "@/lib/db/prisma";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 export async function POST(request) {

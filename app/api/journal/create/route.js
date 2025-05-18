@@ -2,9 +2,9 @@
  * API Handler untuk membuat jurnal baru dan memverifikasi tanda tangan
  */
 import { NextResponse } from "next/server";
-import { getUserFromToken } from "../../../../../middleware/auth";
-import prisma from "../../../../../lib/db/prisma";
-import { verifySignature } from "../../../../../lib/crypto/ecdsa";
+import { getUserFromToken } from "@/middleware/auth";
+import prisma from "@/lib/db/prisma";
+import { verifySignature } from "@/lib/crypto/ecdsa";
 
 export async function POST(request) {
   try {

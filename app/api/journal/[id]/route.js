@@ -2,8 +2,8 @@
  * API Handler untuk mendapatkan detail jurnal berdasarkan ID
  */
 import { NextResponse } from "next/server";
-import { getUserFromToken } from "../../../../../middleware/auth";
-import prisma from "../../../../../lib/db/prisma";
+import { getUserFromToken } from "@/middleware/auth";
+import prisma from "@/lib/db/prisma";
 
 export async function GET(request, { params }) {
   try {
