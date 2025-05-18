@@ -75,7 +75,7 @@ export default function VerifyJournal() {
         </p>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-[2fr_1fr]">
+      <div className="grid gap-8 md:grid-cols-1">
         <div className="space-y-6">
           <Card>
             <CardHeader>
