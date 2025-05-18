@@ -1,0 +1,37 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Model User untuk autentikasi dan identifikasi pengguna
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  publicKey     String?   // Kunci publik ECDSA P-256 dalam format base64
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  journals      Journal[]
+}
+
+// Model Journal untuk menyimpan jurnal digital
+model Journal {
+  id            String    @id @default(cuid())
+  title         String
+  content       String    // Isi jurnal dalam format teks
+  signature     String    // Tanda tangan digital dalam format base64
+  publicKey     String    // Kunci publik yang digunakan untuk verifikasi
+  verified      Boolean   @default(false)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
