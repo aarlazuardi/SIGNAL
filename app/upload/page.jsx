@@ -1,4 +1,4 @@
-import ExportJournal from "@/components/export-journal";
+import ExportJournal from "@/components/upload-journal";
 
 export default function ExportPage() {
   return <ExportJournal />;
