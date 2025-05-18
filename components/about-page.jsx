@@ -6,7 +6,12 @@ export default function AboutPage() {
           Tentang SIGNAL
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
-          Platform penandatanganan jurnal digital dengan algoritma ECDSA P-256
+          SIGNAL (Secure Integrity-Guarded Journal menggunakan ECDSA P-256) 
+          merupakan platform penandatanganan jurnal digital dengan algoritma ECDSA P-256. 
+          Platform ini menyediakan antarmuka intuitif bagi penulis untuk menandatangani 
+          dan memverifikasi jurnal mereka secara real-time. Selain itu, SIGNAL mendukung 
+          integrasi mudah dengan sistem manajemen dokumen yang sudah ada, 
+          sehingga memudahkan adopsi di berbagai lingkungan akademik dan korporat.  
         </p>
       </div>
 
