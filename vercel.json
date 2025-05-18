@@ -1,10 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run vercel-build",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["sin1"],
-  "env": {
-    "NEXTAUTH_URL": "${URL}"
-  }
+  "regions": ["sin1"]
 }
