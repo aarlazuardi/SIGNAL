@@ -32,12 +32,52 @@ export async function verifyPdfSignature(pdfBytes) {
 
     // === HASH PDF ASLI YANG DIUPLOAD USER ===
     const uploadedPdfHash = getCanonicalPdfHash(pdfBytes, "hex");
-    console.log("[VERIFY] Uploaded canonical PDF hash:", uploadedPdfHash); // Load PDF document untuk ekstrak metadata
+    console.log("[VERIFY] Uploaded canonical PDF hash:", uploadedPdfHash);
+
+    // Load PDF document untuk ekstrak metadata
     const pdfDoc = await PDFDocument.load(pdfBytes);
+
+    // Ekstrak metadata menggunakan fungsi yang sudah ditingkatkan
     const metadata = await extractSignatureMetadataFromPdf(pdfBytes);
 
     if (!metadata) {
       console.log("[VERIFY] No signature metadata found in PDF");
+
+      // Tambahan: Coba log semua metadata standard PDF untuk troubleshooting
+      console.log("[VERIFY] Available standard PDF metadata:");
+      console.log("- Title:", pdfDoc.getTitle());
+      console.log("- Author:", pdfDoc.getAuthor());
+      console.log("- Subject:", pdfDoc.getSubject());
+      console.log("- Creator:", pdfDoc.getCreator());
+      console.log("- Producer:", pdfDoc.getProducer());
+      console.log("- Keywords:", pdfDoc.getKeywords());
+
+      // Tambahan: Coba baca langsung dari Info Dictionary untuk debugging
+      try {
+        if (
+          pdfDoc.context &&
+          pdfDoc.context.trailerInfo &&
+          pdfDoc.context.trailerInfo.Info
+        ) {
+          console.log(
+            "[VERIFY] Raw Info Dictionary keys:",
+            Object.keys(pdfDoc.context.trailerInfo.Info)
+          );
+          // Cek apakah ada keys yang mengandung "Signal" atau metadata
+          for (const key of Object.keys(pdfDoc.context.trailerInfo.Info)) {
+            if (
+              key.includes("Signal") ||
+              key.includes("META") ||
+              key.includes("Data")
+            ) {
+              console.log(`[VERIFY] Found suspicious key: ${key}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.log("[VERIFY] Error accessing raw Info Dictionary:", e);
+      }
+
       return {
         verified: false,
         message:
