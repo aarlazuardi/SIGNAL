@@ -41,7 +41,8 @@ export default function VerificationPage() {
         valid: result.verified,
         message: result.verified
           ? "Tanda tangan digital valid. Dokumen ini asli dan tidak diubah sejak ditandatangani."
-          : result.message || "Tanda tangan digital tidak valid. Dokumen mungkin telah diubah atau kunci publik tidak cocok.",
+          : result.message ||
+            "Tanda tangan digital tidak valid. Dokumen mungkin telah diubah atau kunci publik tidak cocok.",
         timestamp: new Date().toISOString(),
         documentName: file.name,
         signer: result.author?.name || result.signer || null,

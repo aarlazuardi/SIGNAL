@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,15 @@ import mammoth from "mammoth/mammoth.browser";
 import PdfWorkerInitializer from "@/components/pdf-worker-initializer";
 import JournalPdfViewer from "@/components/journal-pdf-viewer";
 
-export default function SignPage() {
+export default function SignPageWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignPage />
+    </Suspense>
+  );
+}
+
+function SignPage() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();

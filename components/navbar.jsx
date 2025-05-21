@@ -30,7 +30,7 @@ export default function Navbar() {
   const navigation = [
     { name: "Beranda", href: "/" },
     { name: "Buat Jurnal", href: "/create", requiresAuth: true },
-    { name: "Ekspor Jurnal", href: "/export", requiresAuth: true },
+    { name: "Upload Jurnal", href: "/export", requiresAuth: true },
     { name: "Verifikasi", href: "/verify" },
     { name: "Tentang", href: "/about" },
   ];
@@ -102,9 +102,7 @@ export default function Navbar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem asChild className="text-sm py-1.5">
-                    <Link href="/dashboard">Dashboard</Link>
-                  </DropdownMenuItem>
+                  
                   <DropdownMenuItem asChild className="text-sm py-1.5">
                     <Link href="/profile">Profil</Link>
                   </DropdownMenuItem>
@@ -220,18 +218,7 @@ export default function Navbar() {
                           </span>
                         </div>
                         <div className="flex flex-col space-y-2.5">
-                          <Button
-                            variant="outline"
-                            className="h-10 text-base justify-start"
-                            asChild
-                          >
-                            <Link
-                              href="/dashboard"
-                              onClick={() => setShowMobileMenu(false)}
-                            >
-                              Dashboard
-                            </Link>
-                          </Button>
+                          
                           <Button
                             variant="outline"
                             className="h-10 text-base justify-start"

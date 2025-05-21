@@ -15,7 +15,10 @@ export async function POST(request) {
       const formData = await request.formData();
       const file = formData.get("file");
       if (!file) {
-        return NextResponse.json({ error: "File PDF tidak ditemukan" }, { status: 400 });
+        return NextResponse.json(
+          { error: "File PDF tidak ditemukan" },
+          { status: 400 }
+        );
       }
       // Read PDF bytes
       const arrayBuffer = await file.arrayBuffer();
@@ -23,6 +26,8 @@ export async function POST(request) {
       // Load PDF and extract metadata
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const keywords = pdfDoc.getKeywords();
+      // Tambahkan log debug untuk keywords
+      console.log("[PDF VERIFY] Keywords from PDF:", keywords);
       let customMeta = null;
       if (keywords && Array.isArray(keywords)) {
         for (const kw of keywords) {
@@ -33,14 +38,17 @@ export async function POST(request) {
                 customMeta = parsed;
                 break;
               }
-            } catch (e) {}
+            } catch (e) {
+              console.log("[PDF VERIFY] Failed to parse keyword as JSON:", kw);
+            }
           }
         }
       }
       if (!customMeta) {
         return NextResponse.json({
           verified: false,
-          message: "Metadata tanda tangan tidak ditemukan di PDF. Pastikan file hasil unduhan dari SIGNAL.",
+          message:
+            "Metadata tanda tangan tidak ditemukan di PDF. Pastikan file hasil unduhan dari SIGNAL.",
         });
       }
       const { signal_signature, signal_publicKey } = customMeta;
@@ -58,7 +66,11 @@ export async function POST(request) {
       const signatureBytes = Buffer.from(signal_signature, "base64");
       const publicKeyBytes = Buffer.from(signal_publicKey, "base64");
       const hashBytes = Buffer.from(hash, "hex");
-      const isSignatureValid = p256.verify(signatureBytes, hashBytes, publicKeyBytes);
+      const isSignatureValid = p256.verify(
+        signatureBytes,
+        hashBytes,
+        publicKeyBytes
+      );
       return NextResponse.json({
         verified: isSignatureValid,
         publicKey: signal_publicKey,

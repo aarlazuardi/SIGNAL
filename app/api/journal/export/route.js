@@ -51,7 +51,10 @@ export async function POST(request) {
     // Pastikan jurnal sudah ditandatangani sebelum ekspor PDF
     if (!journal.signature || !journal.publicKey) {
       return NextResponse.json(
-        { error: "Jurnal belum ditandatangani. Silakan tanda tangani jurnal terlebih dahulu sebelum ekspor PDF." },
+        {
+          error:
+            "Jurnal belum ditandatangani. Silakan tanda tangani jurnal terlebih dahulu sebelum ekspor PDF.",
+        },
         { status: 400 }
       );
     }
@@ -228,14 +231,19 @@ export async function POST(request) {
       const customMeta = {
         signal_signature: journal.signature,
         signal_publicKey: journal.publicKey,
-        signal_signedAt: journal.updatedAt ? journal.updatedAt.toISOString() : new Date().toISOString(),
+        signal_signedAt: journal.updatedAt
+          ? journal.updatedAt.toISOString()
+          : new Date().toISOString(),
         signal_journalId: journal.id,
         signal_signer: journal.user.name,
         signal_signer_email: journal.user.email,
       };
       // Always ensure JSON metadata is present in keywords (last element)
       const keywordsArr = [
-        "SIGNAL", "ECDSA", "Digital Signature", JSON.stringify(customMeta)
+        "SIGNAL",
+        "ECDSA",
+        "Digital Signature",
+        JSON.stringify(customMeta),
       ];
       pdfDoc.setKeywords(keywordsArr);
       // Debug log (for development)
