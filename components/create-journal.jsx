@@ -47,7 +47,6 @@ export default function CreateJournal() {
     description: "",
     redirectTo: "",
   });
-
   const handleSave = async () => {
     if (!title || !content) return;
 
@@ -112,6 +111,7 @@ export default function CreateJournal() {
         title: "Draft disimpan",
         description:
           "Jurnal Anda telah berhasil disimpan sebagai draft di database.",
+        variant: "success", // Use success variant for better visibility
       });
 
       // Redirect to dashboard after a delay (if dialog is closed)
@@ -131,8 +131,7 @@ export default function CreateJournal() {
     } finally {
       setIsSaving(false);
     }
-  };
-  const handleExportFile = (format) => {
+  };  const handleExportFile = (format) => {
     if (!title || !content) {
       toast({
         title: "Error",
@@ -155,10 +154,11 @@ export default function CreateJournal() {
       });
       setShowSuccessDialog(true);
 
-      // Toast notification tetap ditampilkan
+      // Toast notification tetap ditampilkan dengan variant success
       toast({
         title: "Jurnal diekspor",
         description: `Jurnal Anda telah berhasil diekspor ke format ${format.toUpperCase()}.`,
+        variant: "success",
       });
     } catch (error) {
       console.error("Error exporting journal:", error);
@@ -177,8 +177,7 @@ export default function CreateJournal() {
   const handleContinueToSign = () => {
     setShowPreviewModal(false);
     setShowPrivateKeyModal(true);
-  };
-  const handleSign = async (signData) => {
+  };  const handleSign = async (signData) => {
     if (!title || !content) return;
     const { privateKey, publicKey, subject, passHash } = signData;
 
@@ -222,9 +221,6 @@ export default function CreateJournal() {
         journalId: savedJournal.id,
       });
 
-      // Tampilkan modal hasil tanda tangan
-      setShowResultModal(true);
-
       // Toast notification tetap ditampilkan
       toast({
         title: "Jurnal ditandatangani",
@@ -232,6 +228,9 @@ export default function CreateJournal() {
           "Jurnal Anda telah berhasil ditandatangani dengan ECDSA P-256.",
         variant: "success",
       });
+      
+      // Langsung arahkan ke halaman tandatangani dengan ID jurnal yang baru dibuat
+      window.location.href = `/tandatangani?id=${savedJournal.id}`;
     } catch (error) {
       console.error("Error signing journal:", error);
       toast({
@@ -351,16 +350,7 @@ export default function CreateJournal() {
         onContinue={handleContinueToSign}
         journalTitle={title}
         content={content}
-      />
-
-      <SignatureResultModal
-        isOpen={showResultModal}
-        onClose={() => {
-          setShowResultModal(false);
-          router.push("/dashboard");
-        }}
-        signatureData={signatureData}
-      />
+      />      {/* SignatureResultModal removed as we directly redirect to the signing page */}
 
       {/* Success Dialog for Draft Save */}
       <Dialog

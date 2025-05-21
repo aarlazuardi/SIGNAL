@@ -2,7 +2,7 @@
 
 ## Deskripsi Aplikasi
 
-SIGNAL (Secure Integrated Global Network for Academic Literature) adalah platform yang dirancang untuk mengelola, berbagi, dan memverifikasi jurnal akademik secara aman. Aplikasi ini memungkinkan pengguna untuk membuat, mengedit, mengekspor, dan memverifikasi jurnal akademik dengan fitur keamanan kriptografi untuk menjamin keaslian dan integritas konten.
+SIGNAL (Secure Integrity-Guarded Journal using ECDSA P-256) adalah platform yang dirancang untuk mengelola, berbagi, dan memverifikasi jurnal akademik secara aman. Aplikasi ini memungkinkan pengguna untuk membuat, mengedit, mengekspor, dan memverifikasi jurnal akademik dengan fitur keamanan kriptografi untuk menjamin keaslian dan integritas konten.
 
 ## Teknologi yang Digunakan
 

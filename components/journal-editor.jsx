@@ -86,7 +86,6 @@ export default function JournalEditor({ id }) {
       setLoading(false);
     }
   };
-
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) {
       addToast({
@@ -129,15 +128,20 @@ export default function JournalEditor({ id }) {
         throw new Error("Gagal menyimpan jurnal");
       }
       
+      const savedJournal = await response.json();
+      
       addToast({
         title: "Sukses",
-        description: id ? "Jurnal berhasil diperbarui" : "Jurnal berhasil dibuat",
+        description: id ? "Jurnal berhasil diperbarui" : "Jurnal berhasil disimpan sebagai draft",
+        variant: "success",
       });
       
       // Redirect to dashboard after successful save
       setTimeout(() => {
         window.location.href = "/dashboard";
       }, 1000);
+      
+      return savedJournal;
       
     } catch (error) {
       console.error("Error saving journal:", error);
@@ -146,22 +150,47 @@ export default function JournalEditor({ id }) {
         description: error.message || "Terjadi kesalahan saat menyimpan jurnal",
         variant: "destructive",
       });
+      return null;
     } finally {
       setSaving(false);
     }
-  };
-  const handleSign = () => {
-    if (!id) {
-      // Jika jurnal belum disimpan, simpan dulu
-      handleSave().then(() => {
-        // Arahkan ke halaman tandatangani setelah berhasil disimpan
+  };  const handleSign = async () => {
+    try {
+      setSigning(true);
+      if (!id) {
+        // Jika jurnal belum disimpan, simpan dulu
+        const savedJournal = await handleSave();
+        if (savedJournal && savedJournal.id) {
+          // Tampilkan notifikasi sukses
+          addToast({
+            title: "Berhasil",
+            description: "Jurnal telah disimpan dan siap untuk ditandatangani",
+            variant: "success",
+          });
+          
+          // Arahkan ke halaman tandatangani setelah berhasil disimpan
+          window.location.href = `/tandatangani?id=${savedJournal.id}`;
+        }
+      } else {
+        // Jika sudah ada ID, langsung arahkan ke halaman tandatangani
+        addToast({
+          title: "Dialihkan",
+          description: "Mengalihkan ke halaman tanda tangan...",
+          variant: "success",
+        });
         window.location.href = `/tandatangani?id=${id}`;
+      }
+      setShowSignDialog(false);
+    } catch (error) {
+      console.error("Error handling sign process:", error);
+      addToast({
+        title: "Error",
+        description: "Gagal mengalihkan ke halaman tanda tangan",
+        variant: "destructive",
       });
-    } else {
-      // Jika sudah ada ID, langsung arahkan ke halaman tandatangani
-      window.location.href = `/tandatangani?id=${id}`;
+    } finally {
+      setSigning(false);
     }
-    setShowSignDialog(false);
   };
 
   return (
@@ -279,15 +308,13 @@ export default function JournalEditor({ id }) {
               Jurnal yang sudah ditandatangani tidak dapat diubah lagi. Pastikan
               konten jurnal sudah benar sebelum ditandatangani.
             </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-amber-800">
+          </DialogHeader>          <div className="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-amber-800">
             <FileText className="h-5 w-5" />
             <p className="text-sm">
               Jurnal akan ditandatangani menggunakan kunci privat Anda dan dapat
-              diverifikasi menggunakan kunci publik.
+              diverifikasi menggunakan kunci publik. Setelah ditandatangani, Anda akan dialihkan ke halaman tanda tangan.
             </p>
-          </div>
-          <DialogFooter className="sm:justify-end">
+          </div><DialogFooter className="sm:justify-end">
             <Button
               variant="outline"
               onClick={() => setShowSignDialog(false)}
@@ -301,7 +328,10 @@ export default function JournalEditor({ id }) {
               disabled={signing}
             >
               {signing ? (
-                <span>Menandatangani...</span>
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Menandatangani...
+                </span>
               ) : (
                 <span>Konfirmasi Tanda Tangan</span>
               )}

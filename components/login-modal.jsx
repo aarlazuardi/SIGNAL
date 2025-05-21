@@ -37,11 +37,15 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
   const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState("");
   const [registerError, setRegisterError] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
+
   const handleGoogleLogin = async (e) => {
     e.preventDefault();
     try {
+      // Show success message before redirecting (since Google auth will navigate away)
+      alert("Anda akan dialihkan ke halaman login Google...");
+
       const result = await signIn("google", {
-        callbackUrl: redirectPath || "/dashboard",
+        callbackUrl: redirectPath || "/",
         redirect: true,
       });
       // The redirect will happen automatically, no need to handle it here
@@ -58,8 +62,15 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
     try {
       await login(loginEmail, loginPassword);
       onClose();
+
+      // Show success notification and redirect
+      alert("Login berhasil!");
+
       if (redirectPath) {
         router.push(redirectPath);
+      } else {
+        // If no specific redirect path, go to homepage
+        router.push("/");
       }
     } catch (error) {
       setLoginError("Email atau password salah. Silakan coba lagi.");
@@ -76,8 +87,15 @@ export default function LoginModal({ isOpen, onClose, redirectPath }) {
     try {
       await register(registerName, registerEmail, registerPassword);
       onClose();
+
+      // Show success notification and redirect
+      alert("Registrasi berhasil!");
+
       if (redirectPath) {
         router.push(redirectPath);
+      } else {
+        // If no specific redirect path, go to homepage
+        router.push("/");
       }
     } catch (error) {
       setRegisterError("Gagal mendaftar. Silakan coba lagi.");

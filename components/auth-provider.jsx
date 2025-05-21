@@ -100,15 +100,29 @@ export function AuthProvider({ children }) {
     }
   };
   const logout = async () => {
-    // First sign out from Next Auth if applicable
-    if (status === "authenticated") {
-      await signOut({ redirect: false });
-    }
+    try {
+      // First sign out from Next Auth if applicable
+      if (status === "authenticated") {
+        await signOut({ redirect: false });
+      }
 
-    // Then clear our local auth
-    logoutUser();
-    setUser(null);
-    setIsAuthenticated(false);
+      // Then clear our local auth
+      logoutUser();
+      setUser(null);
+      setIsAuthenticated(false);
+
+      // Show success notification (using setTimeout to ensure it happens after state updates)
+      setTimeout(() => {
+        if (typeof window !== "undefined") {
+          // Display success toast using browser alert since toast provider may not be accessible here
+          alert("Logout berhasil!");
+          // Redirect to home page
+          window.location.href = "/";
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
   };
 
   // Tambahkan function untuk update data user

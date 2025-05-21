@@ -140,16 +140,17 @@ export default function VerifyJournal() {
       setPdfData("data:application/pdf;base64," + verificationResult.content);
     }
   }, [verificationResult, journalId]);
-
   const handleVerify = async () => {
     if (!file) return;
     setVerifying(true);
     try {
       // Always use the new FormData-based API
       const result = await verifyJournal({ file });
+      const isVerified = result.verified;
+      
       setVerificationResult({
-        valid: result.verified,
-        message: result.verified
+        valid: isVerified,
+        message: isVerified
           ? "Tanda tangan digital valid. Dokumen ini asli dan tidak diubah sejak ditandatangani."
           : result.message ||
             "Tanda tangan digital tidak valid atau dokumen belum ditandatangani.",
@@ -160,6 +161,16 @@ export default function VerifyJournal() {
         id: result.id || null,
         publicKey: result.publicKey || null,
       });
+      
+      // Show appropriate notification
+      toast({
+        title: isVerified ? "Verifikasi Berhasil" : "Verifikasi Gagal",
+        description: isVerified 
+          ? "Dokumen berhasil diverifikasi. Tanda tangan valid."
+          : "Dokumen gagal diverifikasi. Tanda tangan tidak valid atau tidak ditemukan.",
+        variant: isVerified ? "success" : "destructive",
+      });
+      
     } catch (error) {
       console.error("Error verifying document:", error);
       setVerificationResult({
@@ -167,6 +178,12 @@ export default function VerifyJournal() {
         message: "Error verifying document: " + error.message,
         timestamp: new Date().toISOString(),
         documentName: file?.name || "Unknown",
+      });
+      
+      toast({
+        title: "Error",
+        description: "Gagal memverifikasi dokumen: " + error.message,
+        variant: "destructive",
       });
     } finally {
       setVerifying(false);
