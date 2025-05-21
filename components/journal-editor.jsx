@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { ArrowLeft, Save, Shield, FileText, CheckCircle } from "lucide-react";
+import { ArrowLeft, Save, Shield, FileText, CheckCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -17,49 +18,155 @@ import {
 } from "./ui/dialog";
 
 export default function JournalEditor({ id }) {
-  const [title, setTitle] = useState(
-    id ? "Implementasi Digital Signature pada Dokumen Elektronik" : ""
-  );
-  const [content, setContent] = useState(
-    id
-      ? "Digital signature merupakan teknologi yang memungkinkan penandatanganan dokumen secara elektronik dengan menggunakan kriptografi kunci publik. Teknologi ini menjamin keaslian, integritas, dan non-repudiation dari dokumen yang ditandatangani.\n\nPada penelitian ini, kami mengimplementasikan sistem digital signature menggunakan algoritma RSA dan SHA-256 untuk mengamankan dokumen jurnal ilmiah. Hasil penelitian menunjukkan bahwa sistem ini mampu memverifikasi keaslian dokumen dengan tingkat keberhasilan 100% dan waktu verifikasi rata-rata 0.5 detik."
-      : ""
-  );
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const [showSignDialog, setShowSignDialog] = useState(false);
   const [signed, setSigned] = useState(false);
   const [saving, setSaving] = useState(false);
   const [signing, setSigning] = useState(false);
+  const [loading, setLoading] = useState(!!id);
+  const [error, setError] = useState(null);
+  const [readOnly, setReadOnly] = useState(false);
+  const { addToast } = useToast();
 
-  const handleSave = () => {
-    setSaving(true);
-    // Simulasi penyimpanan
-    setTimeout(() => {
-      setSaving(false);
-      // Redirect ke dashboard jika berhasil
-      if (!id) {
-        window.location.href = "/dashboard";
+  // Fetch journal data if id is provided
+  useEffect(() => {
+    if (id) {
+      fetchJournal();
+    }
+    // Force readOnly if opened from /editor/[id] (view mode)
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/editor/')) {
+      setReadOnly(true);
+    }
+  }, [id]);
+
+  const fetchJournal = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("signal_auth_token");
+      
+      if (!token) {
+        addToast({
+          title: "Error",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
       }
-    }, 1500);
+      
+      const response = await fetch(`/api/journal/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Gagal mengambil data jurnal");
+      }
+      
+      const data = await response.json();
+        setTitle(data.title || "");
+      setContent(data.content || "");
+      setSigned(!!data.verified);
+      // Set read-only mode if the document is already signed or if viewing from dashboard
+      setReadOnly(!!data.verified || window.location.pathname.includes('/editor/'));
+      
+    } catch (error) {
+      console.error("Error fetching journal:", error);
+      setError(error.message || "Terjadi kesalahan saat mengambil data jurnal");
+      addToast({
+        title: "Error",
+        description: "Gagal mengambil data jurnal",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSign = () => {
-    setSigning(true);
-    // Simulasi proses penandatanganan
-    setTimeout(() => {
-      setSigning(false);
-      setSigned(true);
-      setShowSignDialog(false);
-      // Redirect ke dashboard setelah berhasil
+  const handleSave = async () => {
+    if (!title.trim() || !content.trim()) {
+      addToast({
+        title: "Error",
+        description: "Judul dan konten jurnal wajib diisi",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      const token = localStorage.getItem("signal_auth_token");
+      
+      if (!token) {
+        addToast({
+          title: "Error",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
+      
+      const url = id ? `/api/journal/${id}` : "/api/journal/create";
+      const method = id ? "PUT" : "POST";
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title, content }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Gagal menyimpan jurnal");
+      }
+      
+      addToast({
+        title: "Sukses",
+        description: id ? "Jurnal berhasil diperbarui" : "Jurnal berhasil dibuat",
+      });
+      
+      // Redirect to dashboard after successful save
       setTimeout(() => {
         window.location.href = "/dashboard";
-      }, 1500);
-    }, 2000);
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Error saving journal:", error);
+      addToast({
+        title: "Error",
+        description: error.message || "Terjadi kesalahan saat menyimpan jurnal",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  const handleSign = () => {
+    if (!id) {
+      // Jika jurnal belum disimpan, simpan dulu
+      handleSave().then(() => {
+        // Arahkan ke halaman tandatangani setelah berhasil disimpan
+        window.location.href = `/tandatangani?id=${id}`;
+      });
+    } else {
+      // Jika sudah ada ID, langsung arahkan ke halaman tandatangani
+      window.location.href = `/tandatangani?id=${id}`;
+    }
+    setShowSignDialog(false);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container flex h-16 items-center justify-between px-4">
+      <header className="border-b">        <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Link href="/dashboard">
               <Button variant="ghost" size="icon">
@@ -68,64 +175,100 @@ export default function JournalEditor({ id }) {
               </Button>
             </Link>
             <h1 className="text-xl font-bold">
-              {id ? "Edit Jurnal" : "Jurnal Baru"}
+              {readOnly ? "Lihat Jurnal" : id ? "Edit Jurnal" : "Jurnal Baru"}
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={handleSave}
-              disabled={saving || !title || !content}
-            >
-              <Save className="h-4 w-4" />
-              <span>{saving ? "Menyimpan..." : "Simpan"}</span>
-            </Button>
-            <Button
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => setShowSignDialog(true)}
-              disabled={!title || !content || signed}
-            >
-              {signed ? (
-                <>
+            {!readOnly && (
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+                onClick={handleSave}
+                disabled={saving || !title || !content}
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span>{saving ? "Menyimpan..." : "Simpan"}</span>
+              </Button>
+            )}
+            {!signed && !readOnly && (
+              <Button
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setShowSignDialog(true)}
+                disabled={!title || !content || signed}
+              >
+                {signed ? (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Ditandatangani</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield className="h-4 w-4" />
+                    <span>Tanda Tangani</span>
+                  </>
+                )}
+              </Button>
+            )}
+            {signed && (
+              <Link href={`/verify?id=${id}`}>
+                <Button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
                   <CheckCircle className="h-4 w-4" />
-                  <span>Ditandatangani</span>
-                </>
-              ) : (
-                <>
-                  <Shield className="h-4 w-4" />
-                  <span>Tanda Tangani</span>
-                </>
-              )}
-            </Button>
+                  <span>Lihat Verifikasi</span>
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
       <main className="container px-4 py-8">
-        <div className="mx-auto max-w-3xl space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="title">Judul Jurnal</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Masukkan judul jurnal"
-              className="text-lg"
-            />
+        {loading ? (
+          <div className="flex justify-center">
+            <Loader2 className="h-6 w-6 animate-spin" />
           </div>
+        ) : error ? (
+          <p className="text-center text-red-500">{error}</p>
+        ) : (
+          <div className="mx-auto max-w-3xl space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="title">Judul Jurnal</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Masukkan judul jurnal"
+                className="text-lg"
+                readOnly={readOnly}
+                disabled={readOnly}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="content">Konten Jurnal</Label>
-            <Textarea
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Tulis konten jurnal di sini..."
-              className="min-h-[400px] resize-y"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="content">Konten Jurnal</Label>
+              <Textarea
+                id="content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Tulis konten jurnal di sini..."
+                className="min-h-[400px] resize-y"
+                readOnly={readOnly}
+                disabled={readOnly}
+              />
+            </div>
+            
+            {readOnly && (
+              <div className="rounded-md bg-gray-100 p-4 text-center dark:bg-gray-800">
+                <p className="text-sm text-muted-foreground">
+                  Dokumen ini dalam mode hanya-baca. {signed ? "Dokumen telah ditandatangani secara digital." : ""}
+                </p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </main>
 
       <Dialog open={showSignDialog} onOpenChange={setShowSignDialog}>

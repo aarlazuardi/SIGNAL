@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { Card, CardContent } from "./ui/card";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { verifyJournal } from "@/lib/api";
 
 export default function VerificationPage() {
   const [file, setFile] = useState(null);
@@ -28,25 +29,36 @@ export default function VerificationPage() {
       setFile(e.target.files[0]);
     }
   };
-
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!file || !publicKey) return;
 
     setVerifying(true);
-    // Simulasi proses verifikasi
-    setTimeout(() => {
-      // Hasil verifikasi acak untuk demo
-      const isValid = Math.random() > 0.3;
+    try {
+      // Kirim file PDF ke backend untuk verifikasi
+      const result = await verifyJournal({ file, publicKey });
+
       setVerificationResult({
-        valid: isValid,
-        message: isValid
+        valid: result.verified,
+        message: result.verified
           ? "Tanda tangan digital valid. Dokumen ini asli dan tidak diubah sejak ditandatangani."
-          : "Tanda tangan digital tidak valid. Dokumen mungkin telah diubah atau kunci publik tidak cocok.",
+          : result.message || "Tanda tangan digital tidak valid. Dokumen mungkin telah diubah atau kunci publik tidak cocok.",
         timestamp: new Date().toISOString(),
         documentName: file.name,
+        signer: result.author?.name || result.signer || null,
+        signingDate: result.signedAt || result.signingDate || null,
+        id: result.id || null,
+        publicKey,
       });
+    } catch (error) {
+      setVerificationResult({
+        valid: false,
+        message: "Error verifying document: " + error.message,
+        timestamp: new Date().toISOString(),
+        documentName: file?.name || "Unknown",
+      });
+    } finally {
       setVerifying(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -155,13 +167,32 @@ export default function VerificationPage() {
                 <div className="mt-4 space-y-1 text-xs sm:text-sm">
                   <p>
                     <strong>Dokumen:</strong> {verificationResult.documentName}
-                  </p>
+                  </p>{" "}
                   <p>
-                    <strong>Waktu Verifikasi:</strong>{" "}
+                    <strong>Waktu Verifikasi:</strong>
                     {new Date(verificationResult.timestamp).toLocaleString(
                       "id-ID"
                     )}
                   </p>
+                  {verificationResult.signer && (
+                    <p>
+                      <strong>Penandatangan:</strong>{" "}
+                      {verificationResult.signer}
+                    </p>
+                  )}
+                  {verificationResult.signingDate && (
+                    <p>
+                      <strong>Tanggal Penandatanganan:</strong>{" "}
+                      {new Date(verificationResult.signingDate).toLocaleString(
+                        "id-ID"
+                      )}
+                    </p>
+                  )}
+                  {verificationResult.id && (
+                    <p>
+                      <strong>ID Verifikasi:</strong> {verificationResult.id}
+                    </p>
+                  )}
                 </div>
               </AlertDescription>
             </Alert>

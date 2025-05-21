@@ -13,54 +13,102 @@ export async function POST(request) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    } // Parse request body
+    const body = await request.json();
+    const { title, content, signature, publicKey, subject, passHash } = body;
 
-    // Parse request body
-    const { title, content, signature, publicKey } = await request.json();
-
-    // Validasi input
-    if (!title || !content || !signature || !publicKey) {
+    console.log("Request body:", {
+      title,
+      contentLength: content ? content.length : 0,
+      hasSignature: !!signature,
+      hasPublicKey: !!publicKey,
+      hasSubject: !!subject,
+    }); // Validasi input
+    if (!title || !content) {
+      console.log("Validation error: Missing title or content");
       return NextResponse.json(
-        { error: "Judul, konten, tanda tangan, dan kunci publik diperlukan" },
+        { error: "Judul dan konten diperlukan" },
         { status: 400 }
       );
     }
 
-    // Verifikasi tanda tangan
-    const isSignatureValid = verifySignature(content, signature, publicKey);
-
-    if (!isSignatureValid) {
+    // Batasi ukuran konten jika terlalu besar
+    if (content.length > 5000000) {
+      // ~5MB limit
+      console.log("Content too large:", content.length);
       return NextResponse.json(
-        { error: "Tanda tangan digital tidak valid" },
+        { error: "Ukuran konten terlalu besar. Maksimal 5MB." },
         { status: 400 }
       );
-    }
+    } // Check if this is a signed or unsigned journal
+    let isVerified = false;
 
-    // Buat jurnal baru dengan tanda tangan yang sudah diverifikasi
-    const journal = await prisma.journal.create({
-      data: {
+    if (signature && publicKey) {
+      // Verifikasi tanda tangan jika ada
+      const isSignatureValid = verifySignature(content, signature, publicKey);
+
+      if (!isSignatureValid) {
+        console.log("Invalid signature");
+        return NextResponse.json(
+          { error: "Tanda tangan digital tidak valid" },
+          { status: 400 }
+        );
+      }
+
+      isVerified = true;
+    }
+    try {
+      // Buat jurnal baru (signed or unsigned)
+      const journalData = {
         title,
         content,
-        signature,
-        publicKey,
-        verified: true,
+        verified: isVerified,
         userId: user.id,
-      },
-    });
+      };
 
-    return NextResponse.json(
-      {
-        id: journal.id,
-        title: journal.title,
-        verified: journal.verified,
-        createdAt: journal.createdAt,
-      },
-      { status: 201 }
-    );
+      // Only add signature and publicKey if they exist
+      if (signature) {
+        journalData.signature = signature;
+      }
+
+      if (publicKey) {
+        journalData.publicKey = publicKey;
+      }
+
+      // Remove subject and passHash fields as they don't exist in the database schema
+
+      console.log("Creating journal with data:", journalData);
+
+      const journal = await prisma.journal.create({
+        data: journalData,
+      });
+
+      console.log("Journal created successfully:", journal.id);
+
+      return NextResponse.json(
+        {
+          id: journal.id,
+          title: journal.title,
+          verified: journal.verified,
+          createdAt: journal.createdAt,
+        },
+        { status: 201 }
+      );
+    } catch (dbError) {
+      console.error("Database error during journal creation:", dbError);
+      return NextResponse.json(
+        {
+          error:
+            "Database error: " + (dbError.message || "Kesalahan pada database"),
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error("Create journal error:", error);
+    console.error("Create journal error:", error.name, error.message);
+    console.error(error.stack);
     return NextResponse.json(
-      { error: "Terjadi kesalahan saat membuat jurnal" },
+      { error: "Terjadi kesalahan saat membuat jurnal: " + error.message },
       { status: 500 }
     );
   }

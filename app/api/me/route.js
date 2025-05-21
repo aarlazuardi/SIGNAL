@@ -11,14 +11,13 @@ export async function GET(request) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Kembalikan data user (tanpa password)
+    } // Kembalikan data user (tanpa password)
     return NextResponse.json({
       id: user.id,
       name: user.name,
       email: user.email,
       publicKey: user.publicKey,
+      signature: user.signature, // Include signature (PassHash) for verification
       createdAt: user.createdAt,
     });
   } catch (error) {

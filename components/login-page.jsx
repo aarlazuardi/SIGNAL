@@ -1,14 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, User, Check } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import Link from "next/link";
 import { FcGoogle } from "react-icons/fc";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 export default function LoginRegisterPage() {
+  const { addToast: toast } = useToast();
+  const router = useRouter();
   const [tab, setTab] = useState("login");
   // Login state
   const [showPassword, setShowPassword] = useState(false);
@@ -20,22 +31,79 @@ export default function LoginRegisterPage() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState("");
 
-  const handleLogin = (e) => {
+  // Success dialog state
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState({
+    title: "",
+    description: "",
+  });
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Implementasi login
-    window.location.href = "/dashboard";
+
+    try {
+      // Implementasi login - ganti dengan API call asli Anda
+      // Mock successful login untuk demo
+      // Tampilkan dialog sukses
+      setDialogMessage({
+        title: "Login Berhasil!",
+        description: "Selamat datang kembali di platform SIGNAL.",
+      });
+      setShowSuccessDialog(true);
+
+      // Arahkan ke dashboard setelah beberapa detik
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: "Login Gagal",
+        description: error.message || "Terjadi kesalahan saat login.",
+        variant: "destructive",
+      });
+    }
   };
-  const handleRegister = (e) => {
+
+  const handleRegister = async (e) => {
     e.preventDefault();
-    // Implementasi register
-    window.location.href = "/dashboard";
+
+    try {
+      // Implementasi register - ganti dengan API call asli Anda
+      // Mock successful registration untuk demo
+      // Tampilkan dialog sukses
+      setDialogMessage({
+        title: "Registrasi Berhasil!",
+        description:
+          "Akun Anda telah berhasil dibuat. Selamat datang di platform SIGNAL.",
+      });
+      setShowSuccessDialog(true);
+
+      // Arahkan ke dashboard setelah beberapa detik
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: "Registrasi Gagal",
+        description: error.message || "Terjadi kesalahan saat registrasi.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleGoogleLogin = (e) => {
     e.preventDefault();
     // Mock Google login logic
-    alert("Google login (mocked)");
-    window.location.href = "/dashboard";
+    setDialogMessage({
+      title: "Login Google Berhasil!",
+      description: "Anda telah berhasil login menggunakan akun Google.",
+    });
+    setShowSuccessDialog(true);
+
+    // Arahkan ke dashboard setelah beberapa detik
+    setTimeout(() => {
+      router.push("/dashboard");
+    }, 2000);
   };
 
   return (
@@ -138,9 +206,9 @@ export default function LoginRegisterPage() {
             >
               <FcGoogle className="h-5 w-5" />
               <span>Login dengan Google</span>
-            </Button>
+            </Button>{" "}
             <div className="mt-4 text-center text-sm">
-              Belum memiliki akun?{" "}
+              Belum memiliki akun?
               <button
                 type="button"
                 onClick={() => setTab("register")}
@@ -215,7 +283,9 @@ export default function LoginRegisterPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="register-password-confirm">Confirm Password</Label>
+              <Label htmlFor="register-password-confirm">
+                Confirm Password
+              </Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
                 <Input
@@ -246,7 +316,9 @@ export default function LoginRegisterPage() {
               </div>
               {registerPasswordConfirm &&
                 registerPassword !== registerPasswordConfirm && (
-                  <div className="text-sm text-red-500">Password tidak sama</div>
+                  <div className="text-sm text-red-500">
+                    Password tidak sama
+                  </div>
                 )}
             </div>
             <Button
@@ -255,9 +327,9 @@ export default function LoginRegisterPage() {
               disabled={registerPassword !== registerPasswordConfirm}
             >
               Daftar
-            </Button>
+            </Button>{" "}
             <div className="mt-4 text-center text-sm">
-              Sudah memiliki akun?{" "}
+              Sudah memiliki akun?
               <button
                 type="button"
                 onClick={() => setTab("login")}
@@ -268,7 +340,23 @@ export default function LoginRegisterPage() {
             </div>
           </form>
         )}
-      </div>
+      </div>{" "}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-600">
+              <Check className="h-6 w-6" />
+              {dialogMessage.title}
+            </DialogTitle>
+            <DialogDescription>{dialogMessage.description}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center">
+            <div className="animate-pulse text-emerald-600 mt-2">
+              Mengalihkan ke dashboard...
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

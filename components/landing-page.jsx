@@ -100,11 +100,11 @@ export default function LandingPage() {
                 </Button>
               </div>
               {/* Background circles for decoration */}
-              <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 sm:h-48 sm:w-48 md:h-64 md:w-64 rounded-full bg-emerald-600/20" />
+              <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 sm:h-48 sm:w-48 md:h-64 md:w-64 rounded-full bg-emerald-600/20" />{" "}
               <div className="pointer-events-none absolute -bottom-16 -left-16 h-32 w-32 sm:h-48 sm:w-48 md:h-64 md:w-64 rounded-full bg-emerald-600/20" />
             </div>
           </div>
-        </section>{" "}
+        </section>
         {/* Features Section */}
         <section className="bg-muted/50 py-8 sm:py-10 md:py-12">
           <div className="container px-4 sm:px-6 md:px-8">

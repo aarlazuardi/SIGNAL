@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -42,150 +42,749 @@ import {
   Shield,
   CheckCircle,
   AlertCircle,
+  Loader2,
+  Eye,
+  FilePlus,
 } from "lucide-react";
+import Link from "next/link";
 import { useToast } from "../hooks/use-toast";
 import PrivateKeyModal from "./private-key-modal";
+import { useAuth } from "./auth-provider";
+import JournalPdfViewer from "./journal-pdf-viewer";
 
 export default function ExportJournal() {
-  const [journals, setJournals] = useState([
-    {
-      id: 1,
-      title: "Implementasi Algoritma ECDSA P-256 untuk Digital Signature",
-      status: "signed",
-      date: "2023-05-15",
-    },
-    {
-      id: 2,
-      title: "Analisis Keamanan Sistem Penandatanganan Digital",
-      status: "unsigned",
-      date: "2023-06-20",
-    },
-    {
-      id: 3,
-      title: "Perbandingan Algoritma Digital Signature: RSA vs ECDSA",
-      status: "signed",
-      date: "2023-07-10",
-    },
-  ]);
+  const [journals, setJournals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { addToast: toast } = useToast();
   const [selectedFile, setSelectedFile] = useState(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false);
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const { toast } = useToast();
+  const [signedPdfUrl, setSignedPdfUrl] = useState(null);
+  const [showSignedPdfModal, setShowSignedPdfModal] = useState(false);
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+  // Check if user is authenticated when component mounts
+  useEffect(() => {
+    const token = localStorage.getItem("signal_auth_token");
+    if (!token && user === null) {
+      toast({
+        title: "Autentikasi diperlukan",
+        description: "Anda harus login untuk mengakses halaman ini.",
+        variant: "destructive",
+      });
+      // Redirect to login page
+      window.location.href = "/login";
+    }
+  }, []);
+
+  // Function to fetch journals
+  const fetchJournals = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("signal_auth_token");
+
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
+
+      const response = await fetch("/api/journal/mine", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API error response:", errorText);
+
+        let errorMessage = "Gagal memuat jurnal";
+        try {
+          // Hanya parse jika errorText berisi valid JSON
+          if (errorText && errorText.trim().startsWith("{")) {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing error response:", e);
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log("Fetched journals:", data);
+
+      // Verifikasi bahwa data adalah array
+      if (!Array.isArray(data)) {
+        console.error("API response is not an array:", data);
+        throw new Error("Format data jurnal tidak valid");
+      }
+
+      // Transform data untuk menyesuaikan dengan UI
+      const formattedJournals = data
+        .map((journal) => {
+          // Validasi data jurnal
+          if (!journal || typeof journal !== "object") {
+            console.error("Invalid journal entry:", journal);
+            return null;
+          }
+
+          return {
+            id: journal.id || "",
+            title: journal.title || "Untitled",
+            status: journal.verified ? "signed" : "unsigned",
+            date: journal.createdAt
+              ? new Date(journal.createdAt).toISOString().split("T")[0]
+              : new Date().toISOString().split("T")[0], // Default ke hari ini jika tidak ada tanggal
+            // Data raw untuk debugging
+            rawDate: journal.createdAt || "",
+          };
+        })
+        .filter(Boolean); // Hapus entri yang null
+
+      setJournals(formattedJournals);
+    } catch (error) {
+      console.error("Error fetching journals:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message || "Gagal memuat jurnal Anda. Silakan coba lagi nanti.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleUpload = () => {
-    if (!selectedFile) return;
+  useEffect(() => {
+    if (user) {
+      fetchJournals();
+    }
+  }, [user]);
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
 
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File terlalu besar",
+          description: "Ukuran maksimal adalah 5MB.",
+          variant: "destructive",
+        });
+        e.target.value = ""; // Reset file input
+        return;
+      }
+
+      // Check file type
+      const validTypes = [".txt", ".md", ".json", ".pdf", ".doc", ".docx"];
+      const fileExt = file.name
+        .substring(file.name.lastIndexOf("."))
+        .toLowerCase();
+
+      if (!validTypes.includes(fileExt)) {
+        toast({
+          title: "Format tidak didukung",
+          description: "Gunakan format TXT, PDF, DOC atau DOCX.",
+          variant: "destructive",
+        });
+        e.target.value = ""; // Reset file input
+        return;
+      }
+
+      setSelectedFile(file);
+    }
+  };
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      toast({
+        title: "File tidak ditemukan",
+        description:
+          "Tidak ada file yang dipilih. Silakan pilih file untuk diunggah.",
+        variant: "destructive",
+      });
+      setIsUploading(false);
+      return;
+    }
+
+    // Check if user is authenticated
+    const token = localStorage.getItem("signal_auth_token");
+    if (!token) {
+      toast({
+        title: "Autentikasi diperlukan",
+        description: "Anda perlu login untuk mengunggah jurnal.",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 1500);
+      return;
+    }
     setIsUploading(true);
 
-    // Simulate upload
-    setTimeout(() => {
-      setIsUploading(false);
-      setShowUploadDialog(false);
-      setSelectedFile(null);
+    let fileContent = "";
+    let fileMetadata = {};
 
-      // Add new journal to the list
+    try {
+      // Verifikasi jenis file untuk menentukan metode pembacaan
+      const fileExt = selectedFile.name
+        .substring(selectedFile.name.lastIndexOf("."))
+        .toLowerCase();
+
+      // Jika berkas PDF, DOC, atau DOCX
+      if ([".pdf", ".doc", ".docx"].includes(fileExt)) {
+        try {
+          // Untuk file binary, baca sebagai ArrayBuffer
+          const arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(e);
+            reader.readAsArrayBuffer(selectedFile);
+          });
+
+          // Konversi ArrayBuffer ke Base64
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+
+          // Simpan sebagai base64 untuk konten file
+          fileContent = window.btoa(binary);
+          console.log(
+            `File binary ${fileExt} berhasil dibaca dan dikonversi ke base64`
+          );
+          console.log(`Base64 content length: ${fileContent.length}`);
+          // Tambahkan metadata file yang akan dikirim bersama konten
+          Object.assign(fileMetadata, {
+            filename: selectedFile.name,
+            fileType: fileExt.substring(1), // hapus titik di awal
+            fileSize: selectedFile.size,
+            uploadedAt: new Date().toISOString(),
+          });
+        } catch (readError) {
+          console.error("Error reading binary file:", readError);
+          toast({
+            title: "Error",
+            description:
+              "Gagal membaca file binary. File mungkin rusak atau tidak didukung.",
+            variant: "destructive",
+          });
+          setIsUploading(false);
+          return;
+        }
+      } else {
+        // Untuk file teks biasa, baca kontennya
+        try {
+          fileContent = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(e);
+            reader.readAsText(selectedFile);
+          });
+        } catch (readError) {
+          console.error("Error reading file:", readError);
+          toast({
+            title: "Error",
+            description:
+              "Gagal membaca file. File mungkin rusak atau tidak didukung.",
+            variant: "destructive",
+          });
+          setIsUploading(false);
+          return;
+        }
+      }
+
+      // Validasi konten file
+      if (!fileContent || fileContent.trim() === "") {
+        toast("File yang diunggah kosong atau tidak berisi konten yang valid.");
+        setIsUploading(false);
+        return;
+      }
+
+      // Log untuk debugging
+      console.log("File content length:", fileContent.length);
+
+      const token = localStorage.getItem("signal_auth_token");
+      if (!token) {
+        toast("Sesi login Anda telah berakhir. Silakan login kembali.");
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
+      console.log(
+        "Sending request to API with token:",
+        token.substring(0, 10) + "..."
+      );
+
+      const response = await fetch("/api/journal/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: selectedFile.name.replace(/\.[^/.]+$/, ""),
+          content: fileContent,
+          metadata: fileMetadata,
+        }),
+      });
+
+      console.log("API response status:", response.status);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API error response:", errorText);
+
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+          console.log("Parsed error data:", errorData);
+        } catch (e) {
+          console.error("Error parsing JSON response:", e);
+          errorData = {
+            error:
+              "Tidak dapat memproses respons dari server: " +
+              errorText.substring(0, 100),
+          };
+        }
+
+        throw new Error(
+          errorData.error ||
+            "Gagal mengunggah jurnal - Status: " + response.status
+        );
+      }
+      const data = await response.json();
+      console.log("Success response data:", data);
+      // Validasi data yang diterima dari server
+      if (!data || !data.id) {
+        throw new Error("Data respons dari server tidak lengkap");
+      }
+
+      // Create a temporary journal entry for immediate UI feedback
       const newJournal = {
-        id: Date.now(),
-        title: selectedFile.name.replace(/\.[^/.]+$/, ""),
+        id: data.id,
+        title: data.title,
         status: "unsigned",
-        date: new Date().toISOString().split("T")[0],
+        date: new Date(data.createdAt || Date.now())
+          .toISOString()
+          .split("T")[0],
       };
 
+      // Immediately update state with optimistic UI
       setJournals([newJournal, ...journals]);
+      setSelectedFile(null);
+      setShowUploadDialog(false);
+      toast("Jurnal berhasil diunggah.");
+
+      // Fetch fresh data from server to ensure consistency
+      await fetchJournals();
+    } catch (error) {
+      console.error("Error during upload:", error);
+      toast(error.message || "Terjadi kesalahan saat mengunggah jurnal.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  const handleSignRequest = (journal) => {
+    if (!journal || !journal.id) {
+      toast({
+        title: "Error",
+        description: "Tidak dapat menandatangani: data jurnal tidak lengkap",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Redirect to signature page instead of showing modal
+    window.location.href = `/tandatangani?id=${journal.id}`;
+  };
+  const handleSign = async (privateKey, passHash) => {
+    if (!selectedJournal || !privateKey) {
+      toast({
+        title: "Data tidak lengkap",
+        description: "Tidak dapat menandatangani dokumen: data tidak lengkap",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("signal_auth_token");
+      if (!token) {
+        toast({
+          title: "Sesi Berakhir",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
+
+      // Generate signature using the provided private key
+      const { sign } = await import("@/lib/crypto/client-ecdsa");
+
+      // Fetch journal content to sign
+      const journalResponse = await fetch(
+        `/api/journal/${selectedJournal.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!journalResponse.ok) {
+        throw new Error("Gagal mengambil konten jurnal");
+      }
+
+      const journalData = await journalResponse.json();
+      // Sign the content
+      const signature = await sign(journalData.content, privateKey);
+      const publicKey = privateKey.publicKey;
+
+      // Prepare additional metadata for the signature process
+      const signatureMetadata = {
+        perihal: "Tanda Tangan Digital ECDSA P-256",
+        signedAt: new Date().toISOString(),
+      };
+
+      // If the journal has metadata from an uploaded file, include it
+      if (journalData.metadata) {
+        Object.assign(signatureMetadata, journalData.metadata);
+      }
+
+      console.log("Signing journal with metadata:", signatureMetadata);
+
+      // Send signature to backend (no pdfHash)
+      const updateResponse = await fetch(
+        `/api/journal/${selectedJournal.id}/sign`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            signature,
+            publicKey,
+            passHash,
+            metadata: signatureMetadata,
+          }),
+        }
+      );
+
+      if (!updateResponse.ok) {
+        let errorMessage = "Gagal menandatangani jurnal";
+        try {
+          const errorData = await updateResponse.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          // If we can't parse JSON, try to get the text
+          try {
+            const errorText = await updateResponse.text();
+            errorMessage = errorText || errorMessage;
+          } catch (textError) {
+            console.error("Error getting response text:", textError);
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Refresh journal list to reflect the new signing status
+      await fetchJournals();
+
+      // Update the UI
+      setJournals((currentJournals) =>
+        currentJournals.map((j) =>
+          j.id === selectedJournal.id ? { ...j, status: "signed" } : j
+        )
+      );
 
       toast({
-        title: "Jurnal diunggah",
-        description: "Jurnal Anda telah berhasil diunggah.",
+        title: "Berhasil",
+        description:
+          "Jurnal Anda telah berhasil ditandatangani dengan ECDSA P-256.",
       });
-    }, 1500);
+
+      // Fetch the signed PDF from backend (assume /api/journal/[id]/export returns PDF)
+      try {
+        const pdfRes = await fetch(
+          `/api/journal/${selectedJournal.id}/export`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (pdfRes.ok) {
+          const pdfBlob = await pdfRes.blob();
+          const pdfUrl = URL.createObjectURL(pdfBlob);
+          setSignedPdfUrl(pdfUrl);
+          setShowSignedPdfModal(true);
+        } else {
+          toast({
+            title: "Gagal Mengambil PDF",
+            description: "Tidak dapat mengambil PDF yang sudah ditandatangani.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        toast({
+          title: "Gagal Mengambil PDF",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
+      setShowPrivateKeyModal(false);
+    } catch (error) {
+      console.error("Error signing journal:", error);
+
+      // Create more detailed error message for debugging
+      let errorMsg = "Gagal menandatangani jurnal.";
+      if (error.message) {
+        errorMsg = error.message;
+      }
+
+      // Add useful instruction
+      if (errorMsg.includes("PassHash tidak cocok")) {
+        errorMsg +=
+          " Pastikan PassHash yang Anda masukkan sama persis dengan yang tersimpan di profil.";
+      }
+
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setSelectedJournal(null);
+      setShowPrivateKeyModal(false); // Ensure modal closes even on error
+    }
   };
 
-  const handleSignRequest = (journal) => {
-    setSelectedJournal(journal);
-    setShowPrivateKeyModal(true);
+  const handleDelete = async (id) => {
+    try {
+      const confirmed = window.confirm(
+        "Apakah Anda yakin ingin menghapus jurnal ini?"
+      );
+      if (!confirmed) return;
+
+      const token = localStorage.getItem("signal_auth_token");
+      if (!token) {
+        toast({
+          title: "Sesi Berakhir",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
+
+      const response = await fetch(`/api/journal/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete journal");
+      }
+
+      setJournals(journals.filter((j) => j.id !== id));
+
+      toast({
+        title: "Sukses",
+        description: "Jurnal berhasil dihapus",
+      });
+    } catch (error) {
+      console.error("Error deleting journal:", error);
+      toast({
+        title: "Error",
+        description: "Gagal menghapus jurnal. Silakan coba lagi nanti.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSign = (signatureData) => {
-    if (!selectedJournal) return;
+  const handleExport = async (journal) => {
+    try {
+      const token = localStorage.getItem("signal_auth_token");
+      if (!token) {
+        toast({
+          title: "Sesi Berakhir",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
 
-    // Update journal status
-    setJournals(
-      journals.map((j) =>
-        j.id === selectedJournal.id ? { ...j, status: "signed" } : j
-      )
-    );
+      const response = await fetch(`/api/journal/${journal.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    toast({
-      title: "Jurnal ditandatangani",
-      description:
-        "Jurnal Anda telah berhasil ditandatangani dengan ECDSA P-256.",
-      variant: "success",
-    });
-  };
+      if (!response.ok) {
+        throw new Error("Failed to fetch journal data");
+      }
 
-  const handleDelete = (id) => {
-    setJournals(journals.filter((j) => j.id !== id));
+      const journalData = await response.json();
+      const exportContent = `SIGNAL - Secure Integrated Global Network for Academic Literature\n---------------------------------------------------------------\nTitle: ${
+        journalData.title
+      }\nAuthor: ${journalData.author?.name || "Anonymous"}\nDate: ${new Date(
+        journalData.createdAt
+      ).toLocaleDateString("id-ID")}\nVerification ID: ${
+        journalData.id
+      }\nVerified: ${
+        journalData.verified ? "Yes" : "No"
+      }\n---------------------------------------------------------------\n\n${
+        journalData.content
+      }\n\n---------------------------------------------------------------\nDigital Signature Information:\nThis document is digitally signed using ECDSA P-256.\nVerification URL: ${
+        window.location.origin
+      }/verify?id=${journalData.id}\n      `;
 
-    toast({
-      title: "Jurnal dihapus",
-      description: "Jurnal telah berhasil dihapus.",
-    });
-  };
+      const blob = new Blob([exportContent], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${journalData.title.replace(/\s+/g, "_")}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
-  const handleExport = (journal) => {
-    toast({
-      title: "Jurnal diunduh",
-      description: `Jurnal "${journal.title}" telah berhasil diunduh sebagai PDF.`,
-    });
+      toast({
+        title: "Berhasil",
+        description: `Jurnal "${journalData.title}" telah berhasil diunduh.`,
+      });
+    } catch (error) {
+      console.error("Error exporting journal:", error);
+      toast({
+        title: "Error",
+        description: "Gagal mengekspor jurnal. Silakan coba lagi nanti.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <div className="container py-8">
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold">Ekspor Jurnal</h1>
+          <h1 className="text-3xl font-bold">Upload Jurnal</h1>
           <p className="text-muted-foreground">
-            Kelola, tandatangani, dan ekspor jurnal Anda ke format PDF.
+            Kelola, tandatangani, dan Upload jurnal Anda.
           </p>
         </div>
-        <Button
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
-          onClick={() => setShowUploadDialog(true)}
-        >
-          <Upload className="h-4 w-4" />
-          <span>Upload Jurnal</span>
-        </Button>
+        <div className="flex gap-3">
+          <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+            <Link href="/create" className="flex items-center gap-2">
+              <FilePlus className="h-4 w-4" />
+              <span>Tulis Jurnal</span>
+            </Link>
+          </Button>
+          <Button
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => setShowUploadDialog(true)}
+          >
+            <Upload className="h-4 w-4" />
+            <span>Upload Jurnal</span>
+          </Button>
+        </div>
       </div>
-
+      {/* Statistik Jurnal - mirip dengan dashboard */}
+      <div className="grid gap-6 md:grid-cols-3 mb-8">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Jurnal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{journals.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Jurnal Ditandatangani
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {journals.filter((j) => j.status === "signed").length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Jurnal Belum Ditandatangani
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {journals.filter((j) => j.status === "unsigned").length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <h2 className="mb-4 text-xl font-bold">Daftar Jurnal</h2>
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Daftar Jurnal</CardTitle>
-          <CardDescription>
-            Jurnal yang telah Anda buat atau unggah. Jurnal yang ditandatangani
-            dapat diekspor ke PDF.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {journals.length > 0 ? (
-            <Table>
-              <TableHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Judul</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Tanggal</TableHead>
+                <TableHead className="w-[100px]">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableHead>Judul</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead className="w-[100px]">Aksi</TableHead>
+                  <TableCell colSpan={4} className="text-center py-8">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                      <p>Memuat jurnal Anda...</p>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {journals.map((journal) => (
+              ) : journals.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-muted-foreground">
+                        Anda belum memiliki jurnal
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => setShowUploadDialog(true)}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        <span>Upload Jurnal</span>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                journals.map((journal) => (
                   <TableRow key={journal.id}>
                     <TableCell className="font-medium">
                       {journal.title}
@@ -204,11 +803,27 @@ export default function ExportJournal() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {new Date(journal.date).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
+                      {journal.date
+                        ? (() => {
+                            try {
+                              return new Date(journal.date).toLocaleDateString(
+                                "id-ID",
+                                {
+                                  day: "numeric",
+                                  month: "long",
+                                  year: "numeric",
+                                }
+                              );
+                            } catch (error) {
+                              console.error(
+                                "Date formatting error:",
+                                error,
+                                journal.date
+                              );
+                              return journal.date; // Tampilkan format asli jika gagal
+                            }
+                          })()
+                        : "Tanggal tidak tersedia"}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -219,23 +834,38 @@ export default function ExportJournal() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {journal.status === "signed" ? (
-                            <DropdownMenuItem
-                              onClick={() => handleExport(journal)}
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/editor/${journal.id}`}
+                              className="flex items-center"
                             >
-                              <Download className="mr-2 h-4 w-4" />
-                              <span>Ekspor PDF</span>
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() => handleSignRequest(journal)}
-                            >
-                              <Shield className="mr-2 h-4 w-4" />
-                              <span>Tanda Tangani PDF</span>
+                              <Eye className="mr-2 h-4 w-4" />
+                              <span>Lihat</span>
+                            </Link>
+                          </DropdownMenuItem>
+                          {journal.status === "unsigned" && (
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/tandatangani?id=${journal.id}`}
+                                className="flex items-center"
+                              >
+                                <Shield className="mr-2 h-4 w-4" />
+                                <span>Tanda Tangani</span>
+                              </Link>
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/verify?id=${journal.id}`}
+                              className="flex items-center"
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              <span>Verifikasi</span>
+                            </Link>
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleDelete(journal.id)}
+                            className="text-red-600"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             <span>Hapus</span>
@@ -244,33 +874,12 @@ export default function ExportJournal() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="mb-2 text-lg font-medium">Belum ada jurnal</h3>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Anda belum memiliki jurnal. Upload jurnal atau buat jurnal baru.
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowUploadDialog(true)}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  <span>Upload Jurnal</span>
-                </Button>
-                <Button asChild>
-                  <a href="/create">Buat Jurnal</a>
-                </Button>
-              </div>
-            </div>
-          )}
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
-
       {/* Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-md">
@@ -283,12 +892,12 @@ export default function ExportJournal() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="file">File Jurnal</Label>
+              <Label htmlFor="file">File Jurnal</Label>{" "}
               <div className="flex items-center gap-2">
                 <Input
                   id="file"
                   type="file"
-                  accept=".pdf,.doc,.docx,.txt"
+                  accept=".txt,.md,.json,.pdf,.doc,.docx"
                   onChange={handleFileChange}
                   className="flex-1"
                 />
@@ -298,6 +907,10 @@ export default function ExportJournal() {
                   File dipilih: {selectedFile.name}
                 </p>
               )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Format yang didukung: TXT, MD, JSON, PDF, DOC, DOCX. Ukuran
+                maksimal: 5MB
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -316,15 +929,60 @@ export default function ExportJournal() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-
+      </Dialog>{" "}
       {/* Private Key Modal */}
       <PrivateKeyModal
         isOpen={showPrivateKeyModal}
         onClose={() => setShowPrivateKeyModal(false)}
         onSign={handleSign}
-        title="Tanda Tangani PDF"
+        title="Tanda Tangani Jurnal"
+        journalId={selectedJournal?.id}
       />
+      {/* Signed PDF Preview Modal */}
+      {showSignedPdfModal && (
+        <Dialog open={showSignedPdfModal} onOpenChange={setShowSignedPdfModal}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Jurnal Ditandatangani</DialogTitle>
+              <DialogDescription>
+                Berikut adalah dokumen PDF yang sudah ditandatangani. Silakan
+                unduh dan lanjutkan ke validasi.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mb-4">
+              {signedPdfUrl && (
+                <JournalPdfViewer url={signedPdfUrl} height={500} />
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                asChild
+                variant="outline"
+                onClick={() => {
+                  if (signedPdfUrl) {
+                    const a = document.createElement("a");
+                    a.href = signedPdfUrl;
+                    a.download = `jurnal-ditandatangani.pdf`;
+                    a.click();
+                  }
+                }}
+              >
+                <span>Download PDF</span>
+              </Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => {
+                  setShowSignedPdfModal(false);
+                  // Optionally, redirect to validation page
+                  window.location.href = "/validasi";
+                }}
+              >
+                Lanjut ke Validasi
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

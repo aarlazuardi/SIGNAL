@@ -22,7 +22,6 @@ export default function Navbar() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { isAuthenticated, logout, user } = useAuth();
-
   // Close mobile menu when path changes
   useEffect(() => {
     setShowMobileMenu(false);
@@ -51,7 +50,6 @@ export default function Navbar() {
           <Shield className="h-[1.2rem] w-[1.2rem] text-emerald-600" />
           <span className="text-lg font-bold leading-none">SIGNAL</span>
         </Link>
-
         {/* Desktop Navigation - Hidden on mobile */}
         <nav className="hidden md:flex items-center mx-6 lg:mx-10 flex-1">
           <ul className="flex items-center gap-3 lg:gap-6">
@@ -77,16 +75,17 @@ export default function Navbar() {
                     >
                       {item.name}
                     </Link>
-                  )}
+                  )}{" "}
                 </li>
               );
             })}
           </ul>
         </nav>
-
         {/* Right Side Actions */}
         <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle />
+          <div className="flex items-center justify-center">
+            <ThemeToggle />
+          </div>
           {/* User Menu - Hidden on Mobile */}
           <div className="hidden md:flex items-center">
             {isAuthenticated ? (
@@ -122,11 +121,11 @@ export default function Navbar() {
                 className="bg-emerald-600 hover:bg-emerald-700 h-9 text-sm px-3 inline-flex items-center"
                 onClick={() => setShowLoginModal(true)}
               >
-                <LogIn className="mr-2 h-[1.2rem] w-[1.2rem]" />
+                <LogIn className="mr-2 h-[1.2rem] w-[1.2rem]" />{" "}
                 <span className="leading-none">Login</span>
               </Button>
             )}
-          </div>{" "}
+          </div>
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center">
             <Sheet open={showMobileMenu} onOpenChange={setShowMobileMenu}>
@@ -138,10 +137,11 @@ export default function Navbar() {
                   aria-label="Buka menu navigasi"
                   aria-expanded={showMobileMenu}
                 >
+                  {" "}
                   <Menu className="h-[1.2rem] w-[1.2rem]" />
                   <span className="sr-only">Menu</span>
                 </Button>
-              </SheetTrigger>{" "}
+              </SheetTrigger>
               <SheetContent
                 side="right"
                 className="w-[85vw] max-w-[280px] sm:max-w-[320px] p-0"
@@ -199,7 +199,7 @@ export default function Navbar() {
                               }`}
                               onClick={() => setShowMobileMenu(false)}
                             >
-                              {item.name}
+                              {item.name}{" "}
                             </Link>
                           )}
                         </li>
@@ -207,6 +207,10 @@ export default function Navbar() {
                     })}
                   </ul>
                   <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-800">
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="font-medium">Theme</div>
+                      <ThemeToggle />
+                    </div>
                     {isAuthenticated ? (
                       <>
                         <div className="mb-4 inline-flex items-center gap-2">

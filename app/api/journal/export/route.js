@@ -48,6 +48,14 @@ export async function POST(request) {
       );
     }
 
+    // Pastikan jurnal sudah ditandatangani sebelum ekspor PDF
+    if (!journal.signature || !journal.publicKey) {
+      return NextResponse.json(
+        { error: "Jurnal belum ditandatangani. Silakan tanda tangani jurnal terlebih dahulu sebelum ekspor PDF." },
+        { status: 400 }
+      );
+    }
+
     // Buat dokumen PDF
     const pdfDoc = await PDFDocument.create();
     const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
@@ -207,6 +215,32 @@ export async function POST(request) {
         color: rgb(0.5, 0.5, 0.5),
       }
     );
+
+    // === Embed ECDSA signature and public key in PDF metadata ===
+    // Always embed signature metadata if journal is signed
+    if (journal.signature && journal.publicKey) {
+      pdfDoc.setTitle(journal.title);
+      pdfDoc.setAuthor(journal.user.name);
+      pdfDoc.setSubject("SIGNAL Journal");
+      pdfDoc.setProducer("SIGNAL Platform");
+      pdfDoc.setCreator("SIGNAL Platform");
+      // Compose custom metadata JSON
+      const customMeta = {
+        signal_signature: journal.signature,
+        signal_publicKey: journal.publicKey,
+        signal_signedAt: journal.updatedAt ? journal.updatedAt.toISOString() : new Date().toISOString(),
+        signal_journalId: journal.id,
+        signal_signer: journal.user.name,
+        signal_signer_email: journal.user.email,
+      };
+      // Always ensure JSON metadata is present in keywords (last element)
+      const keywordsArr = [
+        "SIGNAL", "ECDSA", "Digital Signature", JSON.stringify(customMeta)
+      ];
+      pdfDoc.setKeywords(keywordsArr);
+      // Debug log (for development)
+      console.log("[PDF EXPORT] Metadata signature embedded:", customMeta);
+    }
 
     // Generate dan kembalikan PDF
     const pdfBytes = await pdfDoc.save();

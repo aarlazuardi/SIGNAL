@@ -117,10 +117,10 @@ export default function AboutPage() {
         <section>
           <h2 className="mb-3 sm:mb-4 text-xl sm:text-2xl font-bold">
             Hubungi Kami
-          </h2>
+          </h2>{" "}
           <p className="text-sm sm:text-base text-muted-foreground">
             Jika Anda memiliki pertanyaan atau ingin mengetahui lebih lanjut
-            tentang SIGNAL, jangan ragu untuk menghubungi kami di{" "}
+            tentang SIGNAL, jangan ragu untuk menghubungi kami di
             <a
               href="mailto:info@signal-platform.com"
               className="text-emerald-600 hover:underline"

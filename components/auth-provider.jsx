@@ -62,7 +62,7 @@ export function AuthProvider({ children }) {
     }
 
     fetchUser();
-  }, [session, status]);
+  }, [session?.customToken, status]);
 
   const login = async (email, password) => {
     try {

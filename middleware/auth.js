@@ -8,6 +8,20 @@ import jwt from "jsonwebtoken";
 import prisma from "../lib/db/prisma";
 
 /**
+ * Verifikasi token JWT
+ * @param {string} token - Token JWT yang akan diverifikasi
+ * @returns {object|null} - Payload token jika valid, null jika tidak
+ */
+export function verifyJWT(token) {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    console.error("JWT verification error:", error);
+    return null;
+  }
+}
+
+/**
  * Middleware untuk autentikasi dengan JWT
  * @param {Request} request - Request Next.js
  * @returns {NextResponse} - Response Next.js

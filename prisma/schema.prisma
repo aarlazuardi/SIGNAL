@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,28 +7,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Model User untuk autentikasi dan identifikasi pengguna
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  password      String
-  publicKey     String?   // Kunci publik ECDSA P-256 dalam format base64
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  journals      Journal[]
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  password  String
+  publicKey String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  avatar    String?
+  signature String?
+  journals  Journal[]
+  signedDocuments SignedDocument[] // relasi balik
 }
 
-// Model Journal untuk menyimpan jurnal digital
 model Journal {
-  id            String    @id @default(cuid())
-  title         String
-  content       String    // Isi jurnal dalam format teks
-  signature     String    // Tanda tangan digital dalam format base64
-  publicKey     String    // Kunci publik yang digunakan untuk verifikasi
-  verified      Boolean   @default(false)
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  signature String?
+  publicKey String?
+  verified  Boolean  @default(false)
+  metadata  Json?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signedDocuments SignedDocument[] // relasi balik
+}
+
+model SignedDocument {
+  id         String   @id @default(cuid())
+  userId     String
+  documentId String
+  perihal    String
+  hash       String
+  signature  String
+  signedAt   DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  journal    Journal  @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }

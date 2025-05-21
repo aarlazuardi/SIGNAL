@@ -97,9 +97,9 @@ export default function RegisterPage() {
           >
             Daftar
           </Button>
-        </form>
+        </form>{" "}
         <div className="mt-4 text-center text-sm">
-          Sudah memiliki akun?{" "}
+          Sudah memiliki akun?
           <Link href="/" className="text-emerald-600 hover:underline">
             Masuk
           </Link>

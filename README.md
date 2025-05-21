@@ -85,8 +85,23 @@ SIGNAL menggunakan arsitektur modern dengan pendekatan "App Router" dari Next.js
    - Validasi bahwa jurnal tidak dimodifikasi sejak ditandatangani
 
 4. **Dashboard**
+
    - Pengguna dapat melihat semua jurnal mereka
    - Mengelola profil dan kunci publik mereka
+   - Navigasi ke halaman profil untuk pengaturan akun
+
+5. **Profil Pengguna**
+
+   - Pengguna dapat mengupload dan mengedit avatar profil
+   - Mengubah nama tampilan pengguna
+   - Melihat alamat email terdaftar (tidak dapat diubah)
+   - Mengatur passhash untuk penandatanganan dokumen
+
+6. **Manajemen Profil**
+   - Upload dan perbarui foto profil (avatar)
+   - Edit informasi pribadi seperti nama
+   - Atur passhash untuk penandatanganan digital dokumen
+   - Tampilan email pengguna (hanya baca)
 
 ## Deployment
 

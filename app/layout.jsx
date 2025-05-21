@@ -5,6 +5,7 @@ import Navbar from "@/components/navbar";
 import { AuthProvider } from "@/components/auth-provider";
 import { NextAuthProvider } from "@/components/next-auth-provider";
 import { Toaster } from "@/components/ui/toaster";
+import PdfWorkerInitializerWrapper from "@/components/pdf-worker-initializer-wrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,13 +19,18 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="id" suppressHydrationWarning>
+      {/*
+       */}
       <head>
         <meta
           name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
         />
-      </head>{" "}
+      </head>
+      {/*
+       */}
       <body className={inter.className}>
+        <PdfWorkerInitializerWrapper />
         <NextAuthProvider>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
             <AuthProvider>
@@ -55,6 +61,8 @@ export default function RootLayout({ children }) {
           </ThemeProvider>
         </NextAuthProvider>
       </body>
+      {/*
+       */}
     </html>
   );
 }
