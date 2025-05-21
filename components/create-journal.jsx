@@ -131,7 +131,8 @@ export default function CreateJournal() {
     } finally {
       setIsSaving(false);
     }
-  };  const handleExportFile = (format) => {
+  };
+  const handleExportFile = (format) => {
     if (!title || !content) {
       toast({
         title: "Error",
@@ -177,7 +178,8 @@ export default function CreateJournal() {
   const handleContinueToSign = () => {
     setShowPreviewModal(false);
     setShowPrivateKeyModal(true);
-  };  const handleSign = async (signData) => {
+  };
+  const handleSign = async (signData) => {
     if (!title || !content) return;
     const { privateKey, publicKey, subject, passHash } = signData;
 
@@ -228,7 +230,7 @@ export default function CreateJournal() {
           "Jurnal Anda telah berhasil ditandatangani dengan ECDSA P-256.",
         variant: "success",
       });
-      
+
       // Langsung arahkan ke halaman tandatangani dengan ID jurnal yang baru dibuat
       window.location.href = `/tandatangani?id=${savedJournal.id}`;
     } catch (error) {
@@ -251,7 +253,6 @@ export default function CreateJournal() {
           algoritma ECDSA P-256.
         </p>
       </div>
-
       <div className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="title">Judul Jurnal</Label>
@@ -343,15 +344,14 @@ export default function CreateJournal() {
         title="Tanda Tangani Jurnal"
         journalInfo={{ title, content }}
       />
-
       <SignaturePreviewModal
         isOpen={showPreviewModal}
         onClose={() => setShowPreviewModal(false)}
         onContinue={handleContinueToSign}
         journalTitle={title}
         content={content}
-      />      {/* SignatureResultModal removed as we directly redirect to the signing page */}
-
+      />{" "}
+      {/* SignatureResultModal removed as we directly redirect to the signing page */}
       {/* Success Dialog for Draft Save */}
       <Dialog
         open={showSuccessDialog}

@@ -5,7 +5,14 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { ArrowLeft, Save, Shield, FileText, CheckCircle, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Shield,
+  FileText,
+  CheckCircle,
+  Loader2,
+} from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,7 +42,10 @@ export default function JournalEditor({ id }) {
       fetchJournal();
     }
     // Force readOnly if opened from /editor/[id] (view mode)
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/editor/')) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/editor/")
+    ) {
       setReadOnly(true);
     }
   }, [id]);
@@ -44,7 +54,7 @@ export default function JournalEditor({ id }) {
     try {
       setLoading(true);
       const token = localStorage.getItem("signal_auth_token");
-      
+
       if (!token) {
         addToast({
           title: "Error",
@@ -56,24 +66,25 @@ export default function JournalEditor({ id }) {
         }, 1500);
         return;
       }
-      
+
       const response = await fetch(`/api/journal/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      
+
       if (!response.ok) {
         throw new Error("Gagal mengambil data jurnal");
       }
-      
+
       const data = await response.json();
-        setTitle(data.title || "");
+      setTitle(data.title || "");
       setContent(data.content || "");
       setSigned(!!data.verified);
       // Set read-only mode if the document is already signed or if viewing from dashboard
-      setReadOnly(!!data.verified || window.location.pathname.includes('/editor/'));
-      
+      setReadOnly(
+        !!data.verified || window.location.pathname.includes("/editor/")
+      );
     } catch (error) {
       console.error("Error fetching journal:", error);
       setError(error.message || "Terjadi kesalahan saat mengambil data jurnal");
@@ -95,11 +106,11 @@ export default function JournalEditor({ id }) {
       });
       return;
     }
-    
+
     try {
       setSaving(true);
       const token = localStorage.getItem("signal_auth_token");
-      
+
       if (!token) {
         addToast({
           title: "Error",
@@ -111,10 +122,10 @@ export default function JournalEditor({ id }) {
         }, 1500);
         return;
       }
-      
+
       const url = id ? `/api/journal/${id}` : "/api/journal/create";
       const method = id ? "PUT" : "POST";
-      
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -123,26 +134,27 @@ export default function JournalEditor({ id }) {
         },
         body: JSON.stringify({ title, content }),
       });
-      
+
       if (!response.ok) {
         throw new Error("Gagal menyimpan jurnal");
       }
-      
+
       const savedJournal = await response.json();
-      
+
       addToast({
         title: "Sukses",
-        description: id ? "Jurnal berhasil diperbarui" : "Jurnal berhasil disimpan sebagai draft",
+        description: id
+          ? "Jurnal berhasil diperbarui"
+          : "Jurnal berhasil disimpan sebagai draft",
         variant: "success",
       });
-      
+
       // Redirect to dashboard after successful save
       setTimeout(() => {
         window.location.href = "/dashboard";
       }, 1000);
-      
+
       return savedJournal;
-      
     } catch (error) {
       console.error("Error saving journal:", error);
       addToast({
@@ -154,7 +166,8 @@ export default function JournalEditor({ id }) {
     } finally {
       setSaving(false);
     }
-  };  const handleSign = async () => {
+  };
+  const handleSign = async () => {
     try {
       setSigning(true);
       if (!id) {
@@ -167,7 +180,7 @@ export default function JournalEditor({ id }) {
             description: "Jurnal telah disimpan dan siap untuk ditandatangani",
             variant: "success",
           });
-          
+
           // Arahkan ke halaman tandatangani setelah berhasil disimpan
           window.location.href = `/tandatangani?id=${savedJournal.id}`;
         }
@@ -195,7 +208,9 @@ export default function JournalEditor({ id }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">        <div className="container flex h-16 items-center justify-between px-4">
+      <header className="border-b">
+        {" "}
+        <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Link href="/dashboard">
               <Button variant="ghost" size="icon">
@@ -288,11 +303,12 @@ export default function JournalEditor({ id }) {
                 disabled={readOnly}
               />
             </div>
-            
+
             {readOnly && (
               <div className="rounded-md bg-gray-100 p-4 text-center dark:bg-gray-800">
                 <p className="text-sm text-muted-foreground">
-                  Dokumen ini dalam mode hanya-baca. {signed ? "Dokumen telah ditandatangani secara digital." : ""}
+                  Dokumen ini dalam mode hanya-baca.{" "}
+                  {signed ? "Dokumen telah ditandatangani secara digital." : ""}
                 </p>
               </div>
             )}
@@ -308,13 +324,16 @@ export default function JournalEditor({ id }) {
               Jurnal yang sudah ditandatangani tidak dapat diubah lagi. Pastikan
               konten jurnal sudah benar sebelum ditandatangani.
             </DialogDescription>
-          </DialogHeader>          <div className="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-amber-800">
+          </DialogHeader>{" "}
+          <div className="flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-amber-800">
             <FileText className="h-5 w-5" />
             <p className="text-sm">
               Jurnal akan ditandatangani menggunakan kunci privat Anda dan dapat
-              diverifikasi menggunakan kunci publik. Setelah ditandatangani, Anda akan dialihkan ke halaman tanda tangan.
+              diverifikasi menggunakan kunci publik. Setelah ditandatangani,
+              Anda akan dialihkan ke halaman tanda tangan.
             </p>
-          </div><DialogFooter className="sm:justify-end">
+          </div>
+          <DialogFooter className="sm:justify-end">
             <Button
               variant="outline"
               onClick={() => setShowSignDialog(false)}

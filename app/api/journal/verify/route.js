@@ -5,6 +5,13 @@ import { NextResponse } from "next/server";
 import { verifySignature } from "@/lib/crypto/ecdsa";
 import prisma from "@/lib/db/prisma";
 import { PDFDocument } from "pdf-lib";
+import { verifyPdfSignature } from "./improved-pdf-verification";
+import { extractSignatureMetadataFromPdf } from "@/lib/document-utils";
+import {
+  createHash,
+  createPdfHash,
+  verifyHash,
+} from "@/lib/crypto/document-hash";
 
 export async function POST(request) {
   try {
@@ -30,319 +37,196 @@ export async function POST(request) {
           { status: 400 }
         );
       }
+
       // Read PDF bytes
       const arrayBuffer = await file.arrayBuffer();
       const pdfBytes = new Uint8Array(arrayBuffer);
-      // Load PDF and extract metadata
-      const pdfDoc = await PDFDocument.load(pdfBytes);
-      const keywords = pdfDoc.getKeywords();
-      // Tambahkan log debug untuk keywords
-      console.log("[PDF VERIFY] Keywords from PDF:", keywords);
-      let customMeta = null;
-      if (keywords && Array.isArray(keywords)) {
-        for (const kw of keywords) {
-          if (kw.startsWith("{")) {
-            try {
-              const parsed = JSON.parse(kw);
-              if (parsed.signal_signature && parsed.signal_publicKey) {
-                customMeta = parsed;
-                break;
-              }
-            } catch (e) {
-              console.log("[PDF VERIFY] Failed to parse keyword as JSON:", kw);
-            }
-          }
+
+      // Calculate hash of uploaded PDF for database lookup
+      const uploadedPdfHash = createPdfHash(pdfBytes, "hex");
+      console.log("[PDF VERIFY] Uploaded PDF hash:", uploadedPdfHash);
+
+      // Try to verify using embedded metadata first
+      console.log("[PDF VERIFY] Verifying using embedded metadata");
+      const verificationResult = await verifyPdfSignature(pdfBytes);
+
+      // If no metadata found
+      if (verificationResult.status === "missing_metadata") {
+        console.log(
+          "[PDF VERIFY] No metadata found in PDF, trying database lookup"
+        ); // Try to find document by hash or originalHash in database as fallback
+        const signedDocument = await prisma.signedDocument.findFirst({
+          where: {
+            OR: [{ hash: uploadedPdfHash }, { originalHash: uploadedPdfHash }],
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                publicKey: true,
+              },
+            },
+            journal: true,
+          },
+        });
+
+        if (signedDocument) {
+          console.log("[PDF VERIFY] Found document in database by hash");
+
+          // Verify signature using database data
+          const isSignatureValid = verifySignature(
+            signedDocument.journal.content,
+            signedDocument.signature,
+            signedDocument.user.publicKey
+          );
+
+          return NextResponse.json({
+            verified: isSignatureValid,
+            id: signedDocument.journal.id,
+            title: signedDocument.journal.title,
+            author: {
+              name: signedDocument.user.name,
+              email: signedDocument.user.email,
+            },
+            signedAt: signedDocument.signedAt,
+            publicKey: signedDocument.user.publicKey,
+            message: isSignatureValid
+              ? "Dokumen terverifikasi dan cocok dengan jurnal yang terdaftar (berdasarkan hash)"
+              : "Dokumen ditemukan tetapi tanda tangan digital tidak valid",
+            status: isSignatureValid ? "success" : "invalid_signature",
+            verificationMethod: "database",
+          });
+        } else {
+          // No metadata and not found in database
+          return NextResponse.json(
+            {
+              verified: false,
+              error:
+                "Metadata tanda tangan tidak ditemukan dalam dokumen PDF dan dokumen tidak terdaftar di database.",
+              status: "missing_metadata",
+            },
+            { status: 400 }
+          );
         }
       }
-      if (!customMeta) {
+
+      // If signature verification from metadata successful
+      if (verificationResult.verified) {
+        console.log(
+          "[PDF VERIFY] Document successfully verified through embedded metadata"
+        );
+
+        // Check if file might have been slightly modified
+        let fileHashMatch = false;
+
+        if (verificationResult.originalHash) {
+          try {
+            // Try to find document with matching originalHash in database
+            const signedDocument = await prisma.signedDocument.findFirst({
+              where: {
+                originalHash: verificationResult.originalHash,
+              },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+                journal: true,
+              },
+            });
+
+            if (signedDocument) {
+              console.log(
+                "[PDF VERIFY] Found matching document in database by originalHash"
+              );
+              fileHashMatch = true;
+
+              // Enhance response with database info
+              return NextResponse.json({
+                verified: true,
+                id: signedDocument.journal.id,
+                title: signedDocument.journal.title,
+                author: {
+                  name: signedDocument.user.name,
+                  email: signedDocument.user.email,
+                },
+                signedAt:
+                  signedDocument.signedAt || verificationResult.signingDate,
+                publicKey: verificationResult.publicKey,
+                message:
+                  "Dokumen terverifikasi dan cocok dengan jurnal yang terdaftar",
+                status: "success",
+                fileModified: uploadedPdfHash !== signedDocument.hash,
+                verificationMethod: "hybrid",
+              });
+            }
+          } catch (e) {
+            console.error(
+              "[PDF VERIFY] Error checking database for originalHash:",
+              e
+            );
+          }
+        }
+
+        // Return verification result without database enhancement
         return NextResponse.json({
-          verified: false,
-          message:
-            "Metadata tanda tangan tidak ditemukan di PDF. Pastikan file hasil unduhan dari SIGNAL.",
+          verified: true,
+          message: verificationResult.message,
+          publicKey: verificationResult.publicKey,
+          author: verificationResult.author,
+          signingDate: verificationResult.signingDate,
+          contentIntegrity: true,
+          fileModified: !fileHashMatch,
+          status: verificationResult.status,
+          verificationMethod: "metadata",
         });
+      } else {
+        // Return the verification error
+        return NextResponse.json(
+          {
+            verified: false,
+            message: verificationResult.message,
+            status: verificationResult.status,
+          },
+          { status: 400 }
+        );
       }
-      const { signal_signature, signal_publicKey } = customMeta;
-      if (!signal_signature || !signal_publicKey) {
-        return NextResponse.json({
-          verified: false,
-          message: "Signature atau public key tidak ditemukan di metadata PDF.",
-        });
-      }
-      // Hash the PDF bytes (excluding the signature field is not trivial; for now, hash the full PDF)
-      const crypto = await import("crypto");
-      const hash = crypto.createHash("sha256").update(pdfBytes).digest("hex");
-      // Verify the signature over the PDF bytes
-      const { p256 } = await import("@noble/curves/p256");
-      const signatureBytes = Buffer.from(signal_signature, "base64");
-      const publicKeyBytes = Buffer.from(signal_publicKey, "base64");
-      const hashBytes = Buffer.from(hash, "hex");
-      const isSignatureValid = p256.verify(
-        signatureBytes,
-        hashBytes,
-        publicKeyBytes
-      );
-      return NextResponse.json({
-        verified: isSignatureValid,
-        publicKey: signal_publicKey,
-        message: isSignatureValid
-          ? "Tanda tangan digital valid dan cocok dengan file PDF."
-          : "Tanda tangan digital tidak valid untuk file PDF ini.",
-      });
     }
 
-    // Parse request body
-    const { content, publicKey, signature, journalId, isPdf, pdfHash } =
-      await request.json();
+    // If not a PDF upload, handle as regular JSON API request
+    const body = await request.json();
 
-    // Validate input
-    if (!content && !journalId && !pdfHash) {
+    // Extract necessary data for verification
+    const { signature, publicKey, content } = body;
+
+    if (!signature || !publicKey || !content) {
       return NextResponse.json(
-        { error: "Konten, journalId, atau pdfHash diperlukan" },
+        {
+          error:
+            "Data tidak lengkap. Dibutuhkan tanda tangan, kunci publik, dan konten.",
+        },
         { status: 400 }
       );
     }
 
-    // Case 1: Verify by journal ID
-    if (journalId) {
-      const journal = await prisma.journal.findUnique({
-        where: { id: journalId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
+    // Verify signature
+    const isSignatureValid = verifySignature(content, signature, publicKey);
 
-      if (!journal) {
-        return NextResponse.json(
-          { error: "Jurnal tidak ditemukan" },
-          { status: 404 }
-        );
-      }
-
-      if (!journal.signature || !journal.publicKey) {
-        return NextResponse.json({
-          verified: false,
-          message: "Jurnal belum ditandatangani secara digital",
-        });
-      }
-
-      const isSignatureValid = verifySignature(
-        journal.content,
-        journal.signature,
-        journal.publicKey
-      );
-
-      return NextResponse.json({
-        verified: isSignatureValid,
-        id: journal.id,
-        title: journal.title,
-        author: {
-          name: journal.user.name,
-          email: journal.user.email,
-        },
-        signedAt: journal.updatedAt,
-        publicKey: journal.publicKey,
-        message: isSignatureValid
-          ? "Tanda tangan digital valid"
-          : "Tanda tangan digital tidak valid",
-      });
-    }
-
-    // Case 2: Direct verification with content, signature, and publicKey (from request)
-    if (content && publicKey && signature) {
-      const isSignatureValid = verifySignature(content, signature, publicKey);
-
-      // Find signer info if signature is valid
-      let signerInfo = null;
-      if (isSignatureValid) {
-        const user = await prisma.user.findFirst({
-          where: { publicKey },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        });
-
-        if (user) {
-          signerInfo = {
-            name: user.name,
-            email: user.email,
-          };
-        }
-      }
-
-      return NextResponse.json({
-        verified: isSignatureValid,
-        author: signerInfo,
-        publicKey: publicKey,
-        message: isSignatureValid
-          ? "Tanda tangan digital valid"
-          : "Tanda tangan digital tidak valid",
-      });
-    }
-
-    // Case 3: Find document by content hash
-    if (content) {
-      // Import createDocumentHash function for consistent hashing
-      const { createDocumentHash } = require("@/lib/crypto/ecdsa");
-
-      // Compute hash of the uploaded content
-      const contentHash = createDocumentHash(content, true); // Get hex string hash
-
-      // Find all signed documents
-      const signedDocuments = await prisma.signedDocument.findMany({
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              publicKey: true,
-            },
-          },
-          journal: true,
-        },
-      });
-
-      // Cari dokumen yang cocok dengan hash yang sama
-      let foundDocument = null;
-      let publicKeyFound = null;
-
-      console.log(
-        `Verification: Looking for document with hash: ${contentHash.substring(
-          0,
-          10
-        )}...`
-      );
-
-      for (const doc of signedDocuments) {
-        if (doc.hash && doc.signature && doc.user.publicKey) {
-          // Bandingkan hash dokumen, bukan kontennya
-          console.log(
-            `Comparing with stored hash: ${doc.hash.substring(
-              0,
-              10
-            )}... for doc ID: ${doc.documentId}`
-          );
-
-          if (doc.hash === contentHash) {
-            foundDocument = doc;
-            publicKeyFound = doc.user.publicKey;
-            console.log(`Found matching document with ID: ${doc.documentId}`);
-            break;
-          }
-
-          // Fallback: if hash comparison fails, try to compute fresh hash of stored content
-          const journalContentHash = createDocumentHash(
-            doc.journal.content,
-            true
-          );
-          if (journalContentHash === contentHash) {
-            foundDocument = doc;
-            publicKeyFound = doc.user.publicKey;
-            console.log(
-              `Found matching document with ID: ${doc.documentId} (using content hash)`
-            );
-            break;
-          }
-        }
-      }
-
-      if (foundDocument) {
-        return NextResponse.json({
-          verified: true,
-          id: foundDocument.id,
-          title: foundDocument.journal.title,
-          author: {
-            name: foundDocument.user.name,
-            email: foundDocument.user.email,
-          },
-          signedAt: foundDocument.signedAt,
-          publicKey: publicKeyFound,
-          message:
-            "Dokumen terverifikasi dan cocok dengan jurnal yang terdaftar",
-        });
-      }
-
-      // Jika tidak ditemukan kecocokan
-      return NextResponse.json({
-        verified: false,
-        message:
-          "Tidak ditemukan jurnal yang cocok atau dokumen belum ditandatangani",
-      });
-    }
-
-    // Case 4: Find document by PDF hash
-    if (pdfHash) {
-      // Cari dokumen yang hash-nya sama
-      const signedDocuments = await prisma.signedDocument.findMany({
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              publicKey: true,
-            },
-          },
-          journal: true,
-        },
-      });
-      let foundDocument = null;
-      let publicKeyFound = null;
-      for (const doc of signedDocuments) {
-        if (doc.hash && doc.signature && doc.user.publicKey) {
-          if (doc.hash === pdfHash) {
-            foundDocument = doc;
-            publicKeyFound = doc.user.publicKey;
-            break;
-          }
-        }
-      }
-      if (foundDocument) {
-        // Verifikasi signature (opsional, jika ingin double check)
-        const isSignatureValid = verifySignature(
-          foundDocument.journal.content,
-          foundDocument.signature,
-          foundDocument.user.publicKey
-        );
-        return NextResponse.json({
-          verified: isSignatureValid,
-          id: foundDocument.id,
-          title: foundDocument.journal.title,
-          author: {
-            name: foundDocument.user.name,
-            email: foundDocument.user.email,
-          },
-          signedAt: foundDocument.signedAt,
-          publicKey: publicKeyFound,
-          message: isSignatureValid
-            ? "Dokumen terverifikasi dan cocok dengan jurnal yang terdaftar"
-            : "Tanda tangan digital tidak valid",
-        });
-      }
-      // Jika tidak ditemukan kecocokan
-      return NextResponse.json({
-        verified: false,
-        message:
-          "Dokumen tidak ditemukan berdasarkan hash PDF. Pastikan file yang diupload adalah hasil unduhan dari sistem.",
-      });
-    }
-
-    return NextResponse.json(
-      { error: "Parameter verifikasi tidak cukup" },
-      { status: 400 }
-    );
+    return NextResponse.json({
+      verified: isSignatureValid,
+      message: isSignatureValid
+        ? "Tanda tangan valid"
+        : "Tanda tangan tidak valid",
+    });
   } catch (error) {
-    console.error("Verify signature error:", error);
+    console.error("Error verifying signature:", error);
     return NextResponse.json(
-      { error: "Terjadi kesalahan saat memverifikasi tanda tangan" },
+      { error: `Gagal memverifikasi: ${error.message}` },
       { status: 500 }
     );
   }

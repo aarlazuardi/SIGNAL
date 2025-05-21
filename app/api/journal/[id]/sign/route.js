@@ -4,10 +4,12 @@
 import { NextResponse } from "next/server";
 import { getUserFromToken } from "@/middleware/auth";
 import prisma from "@/lib/db/prisma";
+import { createHash } from "@/lib/crypto/document-hash";
+import { signPdf } from "../../sign/pdf-signer";
 
 export async function POST(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await Promise.resolve(params);
     console.log("Sign request for journal:", id);
 
     // Dapatkan user dari token
@@ -30,7 +32,9 @@ export async function POST(request, { params }) {
         { error: "Jurnal tidak ditemukan" },
         { status: 404 }
       );
-    } // Verifikasi kepemilikan jurnal
+    }
+
+    // Verifikasi kepemilikan jurnal
     if (journal.userId !== user.id) {
       console.log("Journal ownership mismatch:", {
         journalUserId: journal.userId,
@@ -41,6 +45,7 @@ export async function POST(request, { params }) {
         { status: 403 }
       );
     }
+
     // Ambil data dari request
     const data = await request.json();
     console.log("Request data received:", {
@@ -77,7 +82,9 @@ export async function POST(request, { params }) {
         { error: "Perihal wajib diisi" },
         { status: 400 }
       );
-    } // Verifikasi apakah user memiliki passHash yang tersimpan
+    }
+
+    // Verifikasi apakah user memiliki passHash yang tersimpan
     if (!user.signature) {
       console.log("User has no signature stored in profile:", user.id);
       return NextResponse.json(
@@ -87,7 +94,9 @@ export async function POST(request, { params }) {
         },
         { status: 400 }
       );
-    } // Verifikasi kecocokan passHash dengan yang tersimpan di profil
+    }
+
+    // Verifikasi kecocokan passHash dengan yang tersimpan di profil
     console.log("PassHash comparison:", {
       stored: user.signature ? user.signature.substring(0, 3) + "..." : "null",
       provided: passHash ? passHash.substring(0, 3) + "..." : "null",
@@ -105,30 +114,30 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Simpan signature ke tabel SignedDocument (bukan signedDocuments)
+    // Simpan signature ke tabel SignedDocument
     const signedAt = new Date().toISOString();
-    let hash;
-    try {
-      // Import createDocumentHash function to ensure consistent hashing
-      const { createDocumentHash } = require("@/lib/crypto/ecdsa");
-      hash = createDocumentHash(journal.content, true); // true untuk mendapatkan hex string
-    } catch (e) {
-      // Fallback jika require tidak tersedia (misal di edge runtime)
-      hash = "";
-      console.error("Error generating hash:", e);
-    }
+
+    // Calculate document hash using our improved document-hash module
+    const originalDocumentHash = createHash(journal.content, "hex");
+    console.log(
+      "Generated original document hash:",
+      originalDocumentHash.substring(0, 10) + "..."
+    );
 
     console.log("Creating signed document record...");
-    await prisma.signedDocument.create({
+    const signedDoc = await prisma.signedDocument.create({
       data: {
         userId: user.id,
         documentId: journal.id,
         perihal,
-        hash: "", // hash akan diperbarui setelah PDF dihasilkan
+        hash: originalDocumentHash, // Initial hash (will be updated with final PDF hash later)
+        originalHash: originalDocumentHash, // Store original content hash for verification
         signature,
         signedAt: new Date(signedAt),
       },
-    }); // Update jurnal dengan signature dan tanda verified (dengan metadata)
+    });
+
+    // Update jurnal dengan signature dan tanda verified (dengan metadata)
     console.log("Updating journal with signature and metadata...");
 
     // Combine existing metadata with new signature metadata
@@ -140,6 +149,7 @@ export async function POST(request, { params }) {
       signedAt: signedAt,
       signerName: user.name,
       signerEmail: user.email,
+      documentHash: originalDocumentHash,
     };
 
     // If client sent additional metadata, merge it
@@ -159,80 +169,48 @@ export async function POST(request, { params }) {
       },
     });
 
-    // === Generate the final PDF and hash it ===
+    // === Generate the signed PDF using our PDF signer utility ===
     try {
-      // Import PDF generation logic (reuse from /export)
-      const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
-      // Fetch user info for PDF
-      const pdfUser = { name: user.name, email: user.email };
-      // Generate PDF (copy logic from /export)
-      const pdfDoc = await PDFDocument.create();
-      const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
-      const timesRomanBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
-      const page = pdfDoc.addPage([595.28, 841.89]);
-      const { width, height } = page.getSize();
-      const margin = 50;
-      const textSize = 12;
-      const titleSize = 18;
-      const headingSize = 14;
-      page.drawText("SIGNAL - JURNAL DIGITAL", { x: margin, y: height - margin, size: titleSize, font: timesRomanBoldFont, color: rgb(0, 0, 0) });
-      page.drawText(journal.title, { x: margin, y: height - margin - 30, size: headingSize, font: timesRomanBoldFont, color: rgb(0, 0, 0) });
-      page.drawText(`Penulis: ${pdfUser.name}`, { x: margin, y: height - margin - 60, size: textSize, font: timesRomanFont });
-      page.drawText(`Email: ${pdfUser.email}`, { x: margin, y: height - margin - 80, size: textSize, font: timesRomanFont });
-      page.drawText(`Tanggal: ${journal.createdAt.toLocaleDateString()}`, { x: margin, y: height - margin - 100, size: textSize, font: timesRomanFont });
-      page.drawText(`Status Verifikasi: ${journal.verified ? "Terverifikasi" : "Belum Terverifikasi"}`, { x: margin, y: height - margin - 120, size: textSize, font: timesRomanFont, color: journal.verified ? rgb(0, 0.5, 0) : rgb(0.8, 0, 0) });
-      page.drawLine({ start: { x: margin, y: height - margin - 140 }, end: { x: width - margin, y: height - margin - 140 }, thickness: 1, color: rgb(0, 0, 0) });
-      page.drawText("KONTEN JURNAL:", { x: margin, y: height - margin - 170, size: headingSize, font: timesRomanBoldFont });
-      // Simple text wrap
-      const wrapText = (text, font, fontSize, maxWidth) => {
-        const words = text.split(" ");
-        const lines = [];
-        let currentLine = words[0];
-        for (let i = 1; i < words.length; i++) {
-          const word = words[i];
-          const width = font.widthOfTextAtSize(currentLine + " " + word, fontSize);
-          if (width < maxWidth) {
-            currentLine += " " + word;
-          } else {
-            lines.push(currentLine);
-            currentLine = word;
-          }
-        }
-        if (currentLine) lines.push(currentLine);
-        return lines;
+      // Prepare signature data for PDF signing
+      const signatureData = {
+        signature,
+        publicKey,
+        author: user.name,
+        perihal,
+        passHash,
+        timestamp: signedAt,
+        journalId: journal.id,
+        addVerificationPage: true, // Add the verification page with instructions
       };
-      const contentLines = wrapText(journal.content, timesRomanFont, textSize, width - 2 * margin);
-      let yPosition = height - margin - 200;
-      const lineHeight = textSize * 1.2;
-      contentLines.forEach((line) => {
-        if (yPosition < margin + lineHeight) {
-          page.addPage([595.28, 841.89]);
-          yPosition = height - margin;
-        }
-        page.drawText(line, { x: margin, y: yPosition, size: textSize, font: timesRomanFont });
-        yPosition -= lineHeight;
+
+      // Sign the PDF document using our utility
+      const signedPdfBytes = await signPdf(journal.content, signatureData);
+
+      // Calculate the final PDF hash
+      const finalDocumentHash = createHash(signedPdfBytes, "hex");
+
+      // Update the signed document record with the final hash
+      await prisma.signedDocument.update({
+        where: { id: signedDoc.id },
+        data: { hash: finalDocumentHash },
       });
-      const signatureY = Math.max(margin + 140, yPosition - 40);
-      page.drawLine({ start: { x: margin, y: signatureY }, end: { x: width - margin, y: signatureY }, thickness: 1, color: rgb(0, 0, 0) });
-      page.drawText("INFORMASI TANDA TANGAN DIGITAL", { x: margin, y: signatureY - 30, size: headingSize, font: timesRomanBoldFont });
-      page.drawText(`ID Dokumen: ${journal.id}`, { x: margin, y: signatureY - 55, size: textSize, font: timesRomanFont });
-      page.drawText("Tanda tangan digital terverifikasi dengan ECDSA P-256", { x: margin, y: signatureY - 75, size: textSize, font: timesRomanFont });
-      page.drawText(`Kunci publik: ${publicKey.substring(0, 20)}...`, { x: margin, y: signatureY - 95, size: textSize, font: timesRomanFont });
-      page.drawText("Dokumen ini dihasilkan oleh SIGNAL - Platform Jurnal Digital Terverifikasi", { x: margin, y: margin, size: 8, font: timesRomanFont, color: rgb(0.5, 0.5, 0.5) });
-      const pdfBytes = await pdfDoc.save();
-      // Hash the PDF bytes
-      const crypto = require("crypto");
-      const pdfHash = crypto.createHash("sha256").update(Buffer.from(pdfBytes)).digest("hex");
-      // Update signedDocument and journal metadata with the real PDF hash
-      await prisma.signedDocument.updateMany({
-        where: { documentId: journal.id, userId: user.id },
-        data: { hash: pdfHash },
-      });
+
+      // Update journal metadata with the final document hash
       await prisma.journal.update({
         where: { id: journal.id },
-        data: { metadata: { ...metadata, documentHash: pdfHash } },
+        data: {
+          metadata: {
+            ...metadata,
+            documentHash: finalDocumentHash,
+            fileName: `SIGNAL_${journal.id}_signed.pdf`,
+          },
+        },
       });
-      console.log("Final PDF hash stored:", pdfHash);
+
+      console.log(
+        "Final PDF hash stored:",
+        finalDocumentHash.substring(0, 10) + "..."
+      );
     } catch (err) {
       console.error("Failed to generate or hash PDF after signing:", err);
     }

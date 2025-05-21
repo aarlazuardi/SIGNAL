@@ -1,0 +1,333 @@
+/**
+ * Utilitas untuk verifikasi PDF yang ditingkatkan
+ * Mengimplementasikan flow verifikasi sesuai dengan diagram
+ */
+import { PDFDocument } from "pdf-lib";
+import { createHash, verifyHash } from "@/lib/crypto/document-hash";
+import { verifySignature } from "@/lib/crypto/ecdsa";
+
+/**
+ * Verifikasi tanda tangan PDF
+ * @param {Uint8Array} pdfBytes - Bytes dari file PDF
+ * @returns {Promise<Object>} - Hasil verifikasi
+ */
+export async function verifyPdfSignature(pdfBytes) {
+  try {
+    // 1. Upload Dokumen (PDF/DOC) - sudah dilakukan di route handler
+
+    // 2. Kirim dokumen ke server (POST /api/journal/verify)
+
+    // 3. Generate Hash (SHA256)
+    const documentHash = createHash(pdfBytes, "hex");
+    console.log("[VERIFY] Document hash generated:", documentHash);
+    console.log("[VERIFY] PDF size:", pdfBytes.length, "bytes");
+
+    // 4. Hash dokumen
+
+    // 5-6. Ekstrak metadata (tanda tangan dan public key)
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    let metadata = extractSignatureMetadata(pdfDoc);
+
+    if (!metadata) {
+      return {
+        verified: false,
+        message:
+          "Metadata tanda tangan tidak ditemukan di PDF. Pastikan file merupakan hasil unduhan dari SIGNAL.",
+        status: "error",
+      };
+    }
+
+    console.log("[VERIFY] Metadata extracted:", metadata);
+
+    // 7. Menampilkan information signature, hash, publickey
+
+    // 13. Ambil signature & public key
+    const { signature, publicKey, originalHash, signingDate, author } =
+      metadata;
+
+    if (!signature || !publicKey) {
+      return {
+        verified: false,
+        message:
+          "Tanda tangan digital atau kunci publik tidak ditemukan di dokumen.",
+        status: "error",
+      };
+    }
+
+    // 12. Hitung hash dokumen baru (untuk perbandingan dengan yang tersimpan)
+
+    // Verifikasi kecocokan hash (integrity check)
+    if (originalHash && originalHash !== documentHash) {
+      return {
+        verified: false,
+        message:
+          "Dokumen telah dimodifikasi setelah ditandatangani (hash tidak cocok).",
+        status: "modified",
+        documentHash,
+        originalHash,
+      };
+    }
+    // 14. Verifikasi signature
+    // Import verifikasi dari ecdsa.js
+    const { p256 } = await import("@noble/curves/p256");
+
+    try {
+      console.log("[VERIFY] Verifying signature with the following data:");
+      console.log("- Document Hash:", documentHash.substring(0, 20) + "...");
+      console.log(
+        "- Signature (first 20 chars):",
+        signature.substring(0, 20) + "..."
+      );
+      console.log(
+        "- PublicKey (first 20 chars):",
+        publicKey.substring(0, 20) + "..."
+      );
+
+      // Convert signature and public key from base64 to binary
+      const signatureBytes = Buffer.from(signature, "base64");
+      const publicKeyBytes = Buffer.from(publicKey, "base64");
+      
+      // Dua metode verifikasi:
+      // 1. Verifikasi menggunakan hash dokumen seperti sebelumnya
+      const hashBytes = Buffer.from(documentHash, "hex");
+      const isSignatureValidWithHash = p256.verify(
+        signatureBytes,
+        hashBytes,
+        publicKeyBytes
+      );
+      
+      // 2. Verifikasi menggunakan raw document content (bisa jadi lebih cocok dengan cara penandatanganan)
+      // Kita buat hash menggunakan library crypto.js untuk konsistensi
+      const { createDocumentHash } = await import("@/lib/crypto/ecdsa");
+      const messageHash = createDocumentHash(pdfBytes);
+      const isSignatureValidWithContent = p256.verify(
+        signatureBytes,
+        messageHash,
+        publicKeyBytes
+      );
+      
+      // Jika salah satu metode berhasil, anggap verifikasi sukses
+      const isSignatureValid = isSignatureValidWithHash || isSignatureValidWithContent;
+
+      console.log("[VERIFY] Signature verification results:");
+      console.log("- With document hash:", isSignatureValidWithHash);
+      console.log("- With raw content:", isSignatureValidWithContent);
+      console.log("- Final result:", isSignatureValid);
+
+      // 15. Response: Verified (true/false)
+      if (!isSignatureValid) {
+        return {
+          verified: false,
+          message: "Tanda tangan digital tidak valid untuk dokumen ini.",
+          status: "invalid_signature",
+          author,
+          signingDate,
+        };
+      }
+    } catch (error) {
+      console.error("[VERIFY] Error during signature verification:", error);
+      return {
+        verified: false,
+        message: `Error saat memverifikasi tanda tangan: ${error.message}`,
+        status: "error",
+      };
+    }
+
+    // 16. Menampilkan hasil verifikasi
+    return {
+      verified: true,
+      message:
+        "Tanda tangan digital valid. Dokumen ini asli dan tidak diubah sejak ditandatangani.",
+      status: "success",
+      author,
+      signingDate,
+      publicKey,
+    };
+  } catch (error) {
+    console.error("[VERIFY] Error verifying PDF signature:", error);
+    return {
+      verified: false,
+      message: `Gagal memverifikasi dokumen: ${error.message}`,
+      status: "error",
+    };
+  }
+}
+
+/**
+ * Ekstrak metadata tanda tangan dari PDF
+ * @param {PDFDocument} pdfDoc - Dokumen PDF yang sudah dimuat
+ * @returns {Object|null} - Metadata tanda tangan atau null jika tidak ditemukan
+ */
+function extractSignatureMetadata(pdfDoc) {
+  try {
+    const metadata = {
+      signature: null,
+      publicKey: null,
+      originalHash: null,
+      signingDate: null,
+      author: null,
+    };
+
+    // Log all PDF metadata for debugging
+    console.log("[VERIFY] PDF metadata:");
+    console.log("- Title:", pdfDoc.getTitle());
+    console.log("- Author:", pdfDoc.getAuthor());
+    console.log("- Subject:", pdfDoc.getSubject());
+    console.log("- Creator:", pdfDoc.getCreator());
+    console.log("- Producer:", pdfDoc.getProducer());
+
+    // Cek metadata standar
+    if (pdfDoc.getAuthor()) {
+      metadata.author = pdfDoc.getAuthor();
+    }
+    
+    // Variable untuk menampung metadata SIGNAL
+    let signalMetadata = null;
+    
+    // Coba ekstrak dari custom properties
+    try {
+      const properties = pdfDoc.catalog.get(pdfDoc.context.obj("SIGNAL_Properties"));
+      if (properties && properties.get("SIGNAL_Metadata")) {
+        const customMetadata = properties.get("SIGNAL_Metadata").toString();
+        console.log("[VERIFY] Found custom metadata property:", customMetadata.substring(0, 50) + "...");
+        
+        try {
+          const parsed = JSON.parse(customMetadata);
+          if (parsed.signal_signature || parsed.signal_publicKey) {
+            console.log("[VERIFY] Successfully parsed custom metadata");
+            signalMetadata = parsed;
+          }
+        } catch (e) {
+          console.log("[VERIFY] Failed to parse custom metadata:", e);
+        }
+      }
+    } catch (e) {
+      console.log("[VERIFY] No custom metadata properties found:", e);
+    }
+
+    // Ambil metadata dari keywords jika belum ditemukan
+    if (!signalMetadata) {
+      const keywords = pdfDoc.getKeywords();
+      console.log("[VERIFY] Keywords from PDF:", keywords);
+
+      if (!keywords) {
+        console.log("[VERIFY] No keywords found in PDF");
+        if (!signalMetadata) return null;
+      }
+      
+      // Cari metadata SIGNAL dalam keywords
+      
+      // First try: direct parse if keywords is a JSON string
+      if (typeof keywords === "string") {
+        console.log("[VERIFY] Attempting direct parse of keywords string");
+        try {
+          // Check if the entire keywords string is a valid JSON object
+          const entireJson = JSON.parse(keywords);
+          if (entireJson.signal_signature || entireJson.signal_publicKey) {
+            console.log("[VERIFY] Found SIGNAL metadata in direct JSON parse");
+            signalMetadata = entireJson;
+          }
+        } catch (e) {
+          console.log(
+            "[VERIFY] Keywords is not a complete JSON object, trying other methods"
+          );
+        }
+      }
+
+      // Second try: process as array
+      if (!signalMetadata && Array.isArray(keywords)) {
+        console.log("[VERIFY] Processing array keywords");
+        for (const keyword of keywords) {
+          if (typeof keyword === "string" && keyword.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(keyword);
+              if (parsed.signal_signature || parsed.signal_publicKey) {
+                console.log("[VERIFY] Found SIGNAL metadata in array keywords");
+                signalMetadata = parsed;
+                break;
+              }
+            } catch (e) {
+              console.log(
+                "[VERIFY] Failed to parse keyword as JSON:",
+                keyword.substring(0, 30) + "..."
+              );
+            }
+          }
+        }
+      }
+
+      // Third try: find JSON objects in the string
+      if (!signalMetadata && typeof keywords === "string") {
+        console.log("[VERIFY] Processing string keywords to find JSON objects");
+        try {
+          // Clean up the string if needed (some PDFs may add escape characters)
+          const cleanedKeywords = keywords
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, "\\");
+          console.log(
+            "[VERIFY] Cleaned keywords (first 50 chars):",
+            cleanedKeywords.substring(0, 50) + "..."
+          );
+
+          // Try to match all JSON-like patterns
+          const jsonMatches = cleanedKeywords.match(/\{[^{]*?signal_[^}]*\}/g);
+          console.log(
+            "[VERIFY] Found JSON matches:",
+            jsonMatches ? jsonMatches.length : 0
+          );
+
+          if (jsonMatches) {
+            for (const match of jsonMatches) {
+              try {
+                console.log(
+                  "[VERIFY] Attempting to parse match (first 50 chars):",
+                  match.substring(0, 50) + "..."
+                );
+                const parsed = JSON.parse(match);
+                if (parsed.signal_signature || parsed.signal_publicKey) {
+                  console.log("[VERIFY] Found SIGNAL metadata in JSON match");
+                  signalMetadata = parsed;
+                  break;
+                }
+              } catch (e) {
+                console.log("[VERIFY] Failed to parse JSON match:", e.message);
+              }
+            }
+          }
+        } catch (e) {
+          console.log("[VERIFY] Failed to extract JSON from keywords:", e);
+        }
+      }
+    }
+
+    if (!signalMetadata) {
+      return null;
+    }
+
+    // Ekstrak metadata SIGNAL
+    if (signalMetadata.signal_signature) {
+      metadata.signature = signalMetadata.signal_signature;
+    }
+
+    if (signalMetadata.signal_publicKey) {
+      metadata.publicKey = signalMetadata.signal_publicKey;
+    }
+
+    if (signalMetadata.signal_documentHash) {
+      metadata.originalHash = signalMetadata.signal_documentHash;
+    }
+
+    if (signalMetadata.signal_signingDate) {
+      metadata.signingDate = signalMetadata.signal_signingDate;
+    }
+
+    if (signalMetadata.signal_author) {
+      metadata.author = signalMetadata.signal_author;
+    }
+
+    return metadata;
+  } catch (error) {
+    console.error("[VERIFY] Error extracting signature metadata:", error);
+    return null;
+  }
+}

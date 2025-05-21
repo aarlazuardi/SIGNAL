@@ -172,7 +172,8 @@ export default function ExportJournal() {
     if (user) {
       fetchJournals();
     }
-  }, [user]);  const handleFileChange = (e) => {
+  }, [user]);
+  const handleFileChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
       if (
@@ -188,7 +189,7 @@ export default function ExportJournal() {
         setSelectedFile(null);
         return;
       }
-      
+
       // Set the selected file and show a notification
       setSelectedFile(file);
       toast({
@@ -197,7 +198,8 @@ export default function ExportJournal() {
         variant: "default",
       });
     }
-  };const handleUpload = async () => {
+  };
+  const handleUpload = async () => {
     // First check if a file is selected
     if (!selectedFile) {
       toast({
@@ -208,7 +210,7 @@ export default function ExportJournal() {
       });
       return;
     }
-    
+
     // Start the upload process
     setIsUploading(true);
 
@@ -374,11 +376,11 @@ export default function ExportJournal() {
         date: new Date(data.createdAt || Date.now())
           .toISOString()
           .split("T")[0],
-      };      // Immediately update state with optimistic UI
+      }; // Immediately update state with optimistic UI
       setJournals([newJournal, ...journals]);
       setSelectedFile(null);
       setShowUploadDialog(false);
-      
+
       // Show success notification with better formatting
       toast({
         title: "Sukses",
@@ -403,15 +405,15 @@ export default function ExportJournal() {
         variant: "destructive",
       });
       return;
-    }      // Show notification before redirect
-      toast({
-        title: "Dialihkan",
-        description: "Mengalihkan ke halaman tanda tangan...",
-        variant: "default",
-      });
-      
-      // Redirect to signature page instead of showing modal
-      window.location.href = `/tandatangani?id=${journal.id}`;
+    } // Show notification before redirect
+    toast({
+      title: "Dialihkan",
+      description: "Mengalihkan ke halaman tanda tangan...",
+      variant: "default",
+    });
+
+    // Redirect to signature page instead of showing modal
+    window.location.href = `/tandatangani?id=${journal.id}`;
   };
   const handleSign = async (privateKey, passHash) => {
     if (!selectedJournal || !privateKey) {
@@ -513,7 +515,8 @@ export default function ExportJournal() {
         currentJournals.map((j) =>
           j.id === selectedJournal.id ? { ...j, status: "signed" } : j
         )
-      );      toast({
+      );
+      toast({
         title: "Berhasil",
         description:
           "Jurnal Anda telah berhasil ditandatangani dengan ECDSA P-256.",
@@ -603,7 +606,8 @@ export default function ExportJournal() {
         throw new Error("Failed to delete journal");
       }
 
-      setJournals(journals.filter((j) => j.id !== id));      toast({
+      setJournals(journals.filter((j) => j.id !== id));
+      toast({
         title: "Sukses",
         description: "Jurnal berhasil dihapus",
         variant: "success",
@@ -893,7 +897,9 @@ export default function ExportJournal() {
               platform SIGNAL.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">            <div className="space-y-2">
+          <div className="space-y-4 py-4">
+            {" "}
+            <div className="space-y-2">
               <Label htmlFor="file">File Jurnal</Label>{" "}
               <div className="flex items-center gap-2">
                 <Input
@@ -907,14 +913,16 @@ export default function ExportJournal() {
               {selectedFile && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <FileText className="h-4 w-4 text-emerald-600" />
-                  File dipilih: <span className="font-medium">{selectedFile.name}</span>
+                  File dipilih:{" "}
+                  <span className="font-medium">{selectedFile.name}</span>
                 </p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
                 Hanya file PDF yang didukung. Ukuran maksimal: 5MB
               </p>
             </div>
-          </div>          <DialogFooter>
+          </div>{" "}
+          <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setShowUploadDialog(false)}

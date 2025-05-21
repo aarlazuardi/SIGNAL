@@ -8,43 +8,46 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  name      String
-  password  String
-  publicKey String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  avatar    String?
-  signature String?
-  journals  Journal[]
-  signedDocuments SignedDocument[] // relasi balik
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String
+  password        String
+  publicKey       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  avatar          String?
+  signature       String?
+  journals        Journal[]
+  signedDocuments SignedDocument[]
 }
 
 model Journal {
-  id        String   @id @default(cuid())
-  title     String
-  content   String
-  signature String?
-  publicKey String?
-  verified  Boolean  @default(false)
-  metadata  Json?
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  signedDocuments SignedDocument[] // relasi balik
+  id              String           @id @default(cuid())
+  title           String
+  content         String
+  signature       String?
+  publicKey       String?
+  verified        Boolean          @default(false)
+  userId          String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  metadata        Json?
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signedDocuments SignedDocument[]
 }
 
 model SignedDocument {
-  id         String   @id @default(cuid())
-  userId     String
-  documentId String
-  perihal    String
-  hash       String
-  signature  String
-  signedAt   DateTime @default(now())
-
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  journal    Journal  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  userId       String
+  documentId   String
+  perihal      String
+  hash         String   // Hash dari PDF yang telah ditandatangani (akhir)
+  originalHash String?  // Hash dari konten asli dokumen (sebelum ditandatangani)
+  signature    String
+  signedAt     DateTime @default(now())
+  metadata     Json?
+  journal      Journal  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([originalHash])
 }

@@ -144,33 +144,44 @@ export default function VerifyJournal() {
     if (!file) return;
     setVerifying(true);
     try {
+      console.log(
+        "Verifying document:",
+        file.name,
+        "size:",
+        file.size,
+        "bytes"
+      );
+
       // Always use the new FormData-based API
       const result = await verifyJournal({ file });
+      console.log("Verification response:", result);
       const isVerified = result.verified;
-      
+
       setVerificationResult({
         valid: isVerified,
-        message: isVerified
-          ? "Tanda tangan digital valid. Dokumen ini asli dan tidak diubah sejak ditandatangani."
-          : result.message ||
-            "Tanda tangan digital tidak valid atau dokumen belum ditandatangani.",
+        message:
+          result.message ||
+          (isVerified
+            ? "Tanda tangan digital valid. Dokumen ini asli dan tidak diubah sejak ditandatangani."
+            : "Tanda tangan digital tidak valid atau dokumen belum ditandatangani."),
         timestamp: new Date().toISOString(),
         documentName: file.name,
-        signer: result.author?.name || result.signer || null,
+        signer: result.author?.name || result.author || null,
         signingDate: result.signedAt || result.signingDate || null,
         id: result.id || null,
         publicKey: result.publicKey || null,
+        status: result.status || (isVerified ? "success" : "error"),
+        statusText: result.statusText || "",
       });
-      
+
       // Show appropriate notification
       toast({
-        title: isVerified ? "Verifikasi Berhasil" : "Verifikasi Gagal",
-        description: isVerified 
-          ? "Dokumen berhasil diverifikasi. Tanda tangan valid."
-          : "Dokumen gagal diverifikasi. Tanda tangan tidak valid atau tidak ditemukan.",
+        title: isVerified
+          ? "Verifikasi Berhasil"
+          : "Verifikasi " + (result.statusText || "Gagal"),
+        description: result.message,
         variant: isVerified ? "success" : "destructive",
       });
-      
     } catch (error) {
       console.error("Error verifying document:", error);
       setVerificationResult({
@@ -178,8 +189,10 @@ export default function VerifyJournal() {
         message: "Error verifying document: " + error.message,
         timestamp: new Date().toISOString(),
         documentName: file?.name || "Unknown",
+        status: "error",
+        statusText: "Gagal memverifikasi dokumen",
       });
-      
+
       toast({
         title: "Error",
         description: "Gagal memverifikasi dokumen: " + error.message,
@@ -332,7 +345,6 @@ export default function VerifyJournal() {
             </Button>
           </CardContent>
         </Card>
-
         {/* Panduan Verifikasi - Dipindahkan ke bawah input file */}
         <Card className="bg-slate-50 dark:bg-slate-900">
           <CardHeader>
@@ -355,6 +367,7 @@ export default function VerifyJournal() {
               </li>
             </ol>
             <div className="mt-6 rounded-lg bg-muted p-4 text-sm">
+              {" "}
               <h4 className="mb-2 font-medium">Tentang ECDSA P-256</h4>
               <p>
                 ECDSA (Elliptic Curve Digital Signature Algorithm) P-256 adalah
@@ -362,28 +375,51 @@ export default function VerifyJournal() {
                 yang digunakan untuk menjamin keaslian dan integritas dokumen
                 digital.
               </p>
+              <div className="mt-2 text-gray-600 dark:text-gray-400">
+                <h5 className="text-sm font-medium">
+                  Panduan Verifikasi Sukses:
+                </h5>
+                <ul className="mt-1 ml-4 list-disc text-xs space-y-1">
+                  <li>
+                    Pastikan Anda menggunakan file PDF asli yang ditandatangani
+                    dari sistem
+                  </li>
+                  <li>
+                    Hindari mengubah file PDF atau membuka dan menyimpan ulang
+                    dengan editor PDF
+                  </li>
+                  <li>Gunakan versi terbaru browser untuk verifikasi</li>
+                  <li>
+                    Jika verifikasi gagal, periksa apakah file yang sama
+                    berhasil di perangkat lain
+                  </li>
+                </ul>
+              </div>
             </div>
           </CardContent>
-        </Card>
-
+        </Card>{" "}
         {verificationResult && (
           <Alert
             variant={verificationResult.valid ? "default" : "destructive"}
             className={
               verificationResult.valid
                 ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                : verificationResult.status === "modified"
+                ? "border-amber-600 bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
                 : "border-red-600 bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
             }
           >
             {verificationResult.valid ? (
               <CheckCircle className="h-5 w-5" />
+            ) : verificationResult.status === "modified" ? (
+              <Info className="h-5 w-5" />
             ) : (
               <XCircle className="h-5 w-5" />
             )}
             <AlertTitle>
               {verificationResult.valid
                 ? "Verifikasi Berhasil"
-                : "Verifikasi Gagal"}
+                : verificationResult.statusText || "Verifikasi Gagal"}
             </AlertTitle>
             <AlertDescription className="mt-2 space-y-2">
               <p>{verificationResult.message}</p>
@@ -392,24 +428,33 @@ export default function VerifyJournal() {
                   <strong>Dokumen:</strong> {verificationResult.documentName}
                 </p>{" "}
                 <p>
-                  <strong>Waktu Verifikasi:</strong>
+                  <strong>Waktu Verifikasi:</strong>{" "}
                   {new Date(verificationResult.timestamp).toLocaleString(
                     "id-ID"
                   )}
                 </p>
-                {verificationResult.valid && (
+                {(verificationResult.valid ||
+                  verificationResult.status === "modified") && (
                   <>
                     {" "}
                     <p>
-                      <strong>Penandatangan:</strong>
-                      {verificationResult.signer}
+                      <strong>Penandatangan:</strong>{" "}
+                      {verificationResult.signer || "Tidak diketahui"}
                     </p>
-                    <p>
-                      <strong>Tanggal Ditandatangani:</strong>
-                      {new Date(verificationResult.signingDate).toLocaleString(
-                        "id-ID"
-                      )}
-                    </p>
+                    {verificationResult.signingDate && (
+                      <p>
+                        <strong>Tanggal Ditandatangani:</strong>{" "}
+                        {new Date(
+                          verificationResult.signingDate
+                        ).toLocaleString("id-ID")}
+                      </p>
+                    )}
+                    {verificationResult.publicKey && (
+                      <p>
+                        <strong>Public Key:</strong>{" "}
+                        {verificationResult.publicKey.substring(0, 20)}...
+                      </p>
+                    )}
                   </>
                 )}
               </div>
