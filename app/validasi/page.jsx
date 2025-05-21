@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +32,15 @@ if (typeof window !== "undefined") {
   }
 }
 
-export default function ValidationPage() {
+export default function ValidationPageWrapper() {
+  return (
+    <Suspense fallback={<div>Memuat halaman validasi...</div>}>
+      <ValidationPage />
+    </Suspense>
+  );
+}
+
+function ValidationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { addToast: toast } = useToast();
