@@ -26,21 +26,16 @@ export async function POST(request) {
       );
     }
 
-    // Validasi tipe file (opsional)
+    // Validasi tipe file (PDF only)
     const fileType = file.type;
-    const allowedTypes = [
-      "text/plain",
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // docx
-      "application/msword", // doc
-      "text/markdown",
-    ];
-
-    if (!allowedTypes.includes(fileType)) {
+    const allowedTypes = ["application/pdf"];
+    if (
+      !allowedTypes.includes(fileType) &&
+      !(file.name && file.name.toLowerCase().endsWith(".pdf"))
+    ) {
       return NextResponse.json(
         {
-          error:
-            "Format file tidak didukung. Gunakan txt, pdf, doc, docx, atau markdown",
+          error: "Hanya file PDF yang didukung untuk upload jurnal.",
         },
         { status: 400 }
       );
@@ -55,26 +50,14 @@ export async function POST(request) {
       );
     }
 
-    // Ekstrak konten dari file berdasarkan tipe
+    // Ekstrak konten dari file PDF saja
     let content = "";
 
     try {
-      if (fileType === "text/plain" || fileType === "text/markdown") {
-        // Untuk file teks
-        const buffer = Buffer.from(await file.arrayBuffer());
-        content = buffer.toString("utf8");
-      } else if (fileType === "application/pdf") {
-        // Untuk file PDF, kita hanya menyimpan metadata karena ekstraksi konten PDF
-        // memerlukan library tambahan seperti pdf.js atau pdf-parse
-        content = `[PDF Document] ${file.name}\n\nUkuran: ${(
-          file.size / 1024
-        ).toFixed(2)} KB\n\nKonten asli ada di file PDF.`;
-      } else {
-        // Untuk file Word, kita juga hanya menyimpan metadata
-        content = `[Word Document] ${file.name}\n\nUkuran: ${(
-          file.size / 1024
-        ).toFixed(2)} KB\n\nKonten asli ada di file Word.`;
-      }
+      // Untuk file PDF, kita hanya menyimpan metadata karena ekstraksi konten PDF memerlukan library tambahan
+      content = `[PDF Document] ${file.name}\n\nUkuran: ${(
+        file.size / 1024
+      ).toFixed(2)} KB\n\nKonten asli ada di file PDF.`;
     } catch (extractError) {
       console.error("Error extracting content:", extractError);
       return NextResponse.json(

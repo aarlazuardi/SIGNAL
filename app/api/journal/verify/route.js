@@ -20,6 +20,16 @@ export async function POST(request) {
           { status: 400 }
         );
       }
+      // Restrict to PDF only
+      if (
+        (file.type && file.type !== "application/pdf") ||
+        (file.name && !file.name.toLowerCase().endsWith(".pdf"))
+      ) {
+        return NextResponse.json(
+          { error: "Hanya file PDF yang didukung untuk verifikasi." },
+          { status: 400 }
+        );
+      }
       // Read PDF bytes
       const arrayBuffer = await file.arrayBuffer();
       const pdfBytes = new Uint8Array(arrayBuffer);

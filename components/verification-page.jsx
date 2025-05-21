@@ -17,6 +17,7 @@ import Link from "next/link";
 import { Card, CardContent } from "./ui/card";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { verifyJournal } from "@/lib/api";
+import { toast } from "./ui/toast";
 
 export default function VerificationPage() {
   const [file, setFile] = useState(null);
@@ -25,10 +26,25 @@ export default function VerificationPage() {
   const [verificationResult, setVerificationResult] = useState(null);
 
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      if (
+        file.type !== "application/pdf" &&
+        !file.name.toLowerCase().endsWith(".pdf")
+      ) {
+        setFile(null);
+        toast({
+          title: "Format file tidak didukung",
+          description: "Hanya file PDF yang dapat diverifikasi.",
+          variant: "destructive",
+        });
+        e.target.value = "";
+        return;
+      }
+      setFile(file);
     }
   };
+
   const handleVerify = async () => {
     if (!file || !publicKey) return;
 
@@ -98,7 +114,7 @@ export default function VerificationPage() {
                     <Input
                       id="file"
                       type="file"
-                      accept=".pdf,.doc,.docx,.txt"
+                      accept=".pdf"
                       onChange={handleFileChange}
                       className="flex-1 text-sm h-9 sm:h-10"
                     />
@@ -116,6 +132,9 @@ export default function VerificationPage() {
                       File dipilih: {file.name}
                     </p>
                   )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Hanya file PDF yang didukung untuk verifikasi tanda tangan.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5 sm:space-y-2">

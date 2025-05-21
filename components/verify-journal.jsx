@@ -103,17 +103,19 @@ export default function VerifyJournal() {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
 
-      // Validate that it's a PDF file
+      // Strict PDF validation
       if (
-        !selectedFile.type.includes("pdf") &&
+        selectedFile.type !== "application/pdf" &&
         !selectedFile.name.toLowerCase().endsWith(".pdf")
       ) {
         toast({
-          title: "Format File Tidak Didukung",
+          title: "Format file tidak didukung",
           description:
             "Hanya file PDF yang didukung untuk verifikasi tanda tangan.",
           variant: "destructive",
         });
+        e.target.value = "";
+        setFile(null);
         return;
       }
 
@@ -149,7 +151,8 @@ export default function VerifyJournal() {
         valid: result.verified,
         message: result.verified
           ? "Tanda tangan digital valid. Dokumen ini asli dan tidak diubah sejak ditandatangani."
-          : result.message || "Tanda tangan digital tidak valid atau dokumen belum ditandatangani.",
+          : result.message ||
+            "Tanda tangan digital tidak valid atau dokumen belum ditandatangani.",
         timestamp: new Date().toISOString(),
         documentName: file.name,
         signer: result.author?.name || result.signer || null,

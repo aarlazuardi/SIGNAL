@@ -174,36 +174,21 @@ export default function ExportJournal() {
     }
   }, [user]);
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      if (
+        file.type !== "application/pdf" &&
+        !file.name.toLowerCase().endsWith(".pdf")
+      ) {
         toast({
-          title: "File terlalu besar",
-          description: "Ukuran maksimal adalah 5MB.",
+          title: "Format file tidak didukung",
+          description: "Hanya file PDF yang dapat diupload.",
           variant: "destructive",
         });
-        e.target.value = ""; // Reset file input
+        e.target.value = "";
+        setSelectedFile(null);
         return;
       }
-
-      // Check file type
-      const validTypes = [".txt", ".md", ".json", ".pdf", ".doc", ".docx"];
-      const fileExt = file.name
-        .substring(file.name.lastIndexOf("."))
-        .toLowerCase();
-
-      if (!validTypes.includes(fileExt)) {
-        toast({
-          title: "Format tidak didukung",
-          description: "Gunakan format TXT, PDF, DOC atau DOCX.",
-          variant: "destructive",
-        });
-        e.target.value = ""; // Reset file input
-        return;
-      }
-
       setSelectedFile(file);
     }
   };
@@ -834,42 +819,45 @@ export default function ExportJournal() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link
-                              href={`/editor/${journal.id}`}
-                              className="flex items-center"
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              <span>Lihat</span>
-                            </Link>
-                          </DropdownMenuItem>
-                          {journal.status === "unsigned" && (
-                            <DropdownMenuItem asChild>
-                              <Link
-                                href={`/tandatangani?id=${journal.id}`}
-                                className="flex items-center"
+                          {journal.status === "signed" ? (
+                            <>
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/validasi?id=${journal.id}`}
+                                  className="flex items-center"
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  <span>Lihat</span>
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(journal.id)}
+                                className="text-red-600"
                               >
-                                <Shield className="mr-2 h-4 w-4" />
-                                <span>Tanda Tangani</span>
-                              </Link>
-                            </DropdownMenuItem>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Hapus</span>
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <>
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/tandatangani?id=${journal.id}`}
+                                  className="flex items-center"
+                                >
+                                  <Shield className="mr-2 h-4 w-4" />
+                                  <span>Tanda Tangani</span>
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(journal.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Hapus</span>
+                              </DropdownMenuItem>
+                            </>
                           )}
-                          <DropdownMenuItem asChild>
-                            <Link
-                              href={`/verify?id=${journal.id}`}
-                              className="flex items-center"
-                            >
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              <span>Verifikasi</span>
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(journal.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>Hapus</span>
-                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -897,7 +885,7 @@ export default function ExportJournal() {
                 <Input
                   id="file"
                   type="file"
-                  accept=".txt,.md,.json,.pdf,.doc,.docx"
+                  accept=".pdf"
                   onChange={handleFileChange}
                   className="flex-1"
                 />
@@ -908,8 +896,7 @@ export default function ExportJournal() {
                 </p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                Format yang didukung: TXT, MD, JSON, PDF, DOC, DOCX. Ukuran
-                maksimal: 5MB
+                Hanya file PDF yang didukung. Ukuran maksimal: 5MB
               </p>
             </div>
           </div>
