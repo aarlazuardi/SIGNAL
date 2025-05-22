@@ -66,11 +66,24 @@ export async function POST(request) {
       );
     }
 
+    // Baca file PDF sebagai ArrayBuffer
+    let pdfBuffer;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      pdfBuffer = Buffer.from(arrayBuffer);
+    } catch (err) {
+      return NextResponse.json(
+        { error: "Gagal membaca file PDF sebagai buffer" },
+        { status: 500 }
+      );
+    }
+
     // Buat jurnal baru dari file yang diunggah
     const journal = await prisma.journal.create({
       data: {
         title: title,
         content: content,
+        pdfFile: pdfBuffer,
         verified: false,
         userId: user.id,
       },

@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { getUserFromToken } from "@/middleware/auth";
 import prisma from "@/lib/db/prisma";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { createPdfHash } from "@/lib/crypto/document-hash";
+import { generateVerificationQR } from "@/lib/crypto/qr-verification";
 
 export async function POST(request) {
   try {
@@ -46,6 +48,19 @@ export async function POST(request) {
         { error: "Jurnal tidak ditemukan" },
         { status: 404 }
       );
+    }
+
+    // Jika jurnal sudah ditandatangani dan pdfFile tersedia, kembalikan file PDF hasil sign
+    if (journal.verified && journal.pdfFile) {
+      return new NextResponse(journal.pdfFile, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${journal.title
+            .replace(/[^a-z0-9]/gi, "_")
+            .toLowerCase()}_signed.pdf"`,
+        },
+      });
     }
 
     // Pastikan jurnal sudah ditandatangani sebelum ekspor PDF
@@ -250,9 +265,35 @@ export async function POST(request) {
       console.log("[PDF EXPORT] Metadata signature embedded:", customMeta);
     }
 
-    // Generate dan kembalikan PDF
-    const pdfBytes = await pdfDoc.save();
+    // Generate hash dari PDF sebelum disimpan (sementara, sebelum QR code ditambahkan)
+    let pdfBytes = await pdfDoc.save();
+    const documentHash = createPdfHash(pdfBytes, "hex");
 
+    // Generate QR code validasi (berisi link ke halaman validasi dengan id jurnal)
+    const qrDataUrl = await generateVerificationQR(journal.id);
+    // Embed QR code di halaman terakhir
+    const pages = pdfDoc.getPages();
+    const lastPage = pages[pages.length - 1];
+    const qrImage = await pdfDoc.embedPng(qrDataUrl);
+    const qrSize = 80;
+    lastPage.drawImage(qrImage, {
+      x: lastPage.getWidth() - qrSize - 40,
+      y: 40,
+      width: qrSize,
+      height: qrSize,
+    });
+    // Tambahkan hash di footer semua halaman
+    for (const page of pages) {
+      page.drawText(`Hash: ${documentHash.substring(0, 32)}...`, {
+        x: 40,
+        y: 40,
+        size: 8,
+        font: timesRomanFont,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+    }
+    // Simpan ulang PDF dengan QR dan hash di footer
+    pdfBytes = await pdfDoc.save();
     return new NextResponse(pdfBytes, {
       status: 200,
       headers: {

@@ -32,6 +32,7 @@ model Journal {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   metadata        Json?
+  pdfFile         Bytes?           // File PDF asli hasil upload user
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   signedDocuments SignedDocument[]
 }

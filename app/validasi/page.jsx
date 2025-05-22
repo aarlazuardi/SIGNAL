@@ -14,7 +14,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { exportJournalToPDF } from "@/lib/journal-export";
 import { Document, Page, pdfjs } from "react-pdf";
 
 // Initialize PDF.js worker correctly for browser environment
@@ -136,58 +135,41 @@ function ValidationPage() {
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!journal) return;
-
     try {
-      console.log("Memulai proses unduh PDF untuk jurnal:", journal.id);
-
-      // Detect if content might be a binary file (PDF/DOC) from metadata
-      let originalFileType = null;
-      if (journal.metadata?.fileType) {
-        originalFileType = journal.metadata.fileType;
-      } else if (journal.content && journal.content.startsWith("JVBERi0")) {
-        // Looks like a base64 encoded PDF
-        originalFileType = "pdf";
+      const token = localStorage.getItem("signal_auth_token");
+      if (!token) {
+        toast({
+          title: "Autentikasi diperlukan",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          router.push("/login");
+        }, 1500);
+        return;
       }
-
-      // Get metadata for PDF export
-      const metadata = {
-        title: journal.title,
-        subject: journal.metadata?.perihal || "Dokumen Jurnal",
-        creator:
-          journal.metadata?.signerName || journal.user?.name || "SIGNAL User",
-        producer: "SIGNAL - Platform Jurnal dengan ECDSA",
-        creationDate: new Date(journal.metadata?.signedAt || journal.updatedAt),
-        originalFileType: originalFileType,
-        signatureInfo: {
-          signer:
-            journal.metadata?.signerName ||
-            journal.user?.name ||
-            "Pengguna SIGNAL",
-          timestamp: new Date(
-            journal.metadata?.signedAt || journal.updatedAt
-          ).toLocaleString("id-ID"),
-          publicKey: journal.publicKey || "Tidak tersedia",
-          signature: journal.signature || "Tidak tersedia",
+      // POST ke endpoint /api/journal/export dengan body { journalId }
+      const res = await fetch("/api/journal/export", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      };
-
-      console.log("Metadata PDF:", {
-        title: metadata.title,
-        subject: metadata.subject,
-        originalFileType: metadata.originalFileType,
-        hasPerihal: !!journal.metadata?.perihal,
-        hasSignatureInfo: !!metadata.signatureInfo,
+        body: JSON.stringify({ journalId: journal.id }),
       });
-
-      // Export journal to PDF
-      exportJournalToPDF(journal.title, journal.content, metadata);
-
-      toast({
-        title: "Berhasil",
-        description: "Dokumen PDF berhasil diunduh",
-      });
+      if (!res.ok) throw new Error("Gagal mengunduh dokumen PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${journal.title.replace(/[^a-zA-Z0-9]/g, "_")}_signed.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Berhasil", description: "Dokumen PDF berhasil diunduh" });
     } catch (error) {
       console.error("Error downloading PDF:", error);
       toast({

@@ -183,8 +183,17 @@ export async function POST(request, { params }) {
         addVerificationPage: true, // Add the verification page with instructions
       };
 
-      // Sign the PDF document using our utility
-      const signedPdfBytes = await signPdf(journal.content, signatureData);
+      // Gunakan file PDF asli dari field pdfFile
+      if (!journal.pdfFile) {
+        return NextResponse.json(
+          {
+            error:
+              "File PDF asli tidak ditemukan pada jurnal. Upload ulang jurnal dengan file PDF.",
+          },
+          { status: 400 }
+        );
+      }
+      const signedPdfBytes = await signPdf(journal.pdfFile, signatureData);
 
       // Calculate the final PDF hash
       const finalDocumentHash = createHash(signedPdfBytes, "hex");
@@ -195,7 +204,7 @@ export async function POST(request, { params }) {
         data: { hash: finalDocumentHash },
       });
 
-      // Update journal metadata with the final document hash
+      // Update journal metadata dan file PDF hasil sign
       await prisma.journal.update({
         where: { id: journal.id },
         data: {
@@ -204,6 +213,7 @@ export async function POST(request, { params }) {
             documentHash: finalDocumentHash,
             fileName: `SIGNAL_${journal.id}_signed.pdf`,
           },
+          pdfFile: signedPdfBytes,
         },
       });
 

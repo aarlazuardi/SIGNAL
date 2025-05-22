@@ -200,7 +200,6 @@ export default function ExportJournal() {
     }
   };
   const handleUpload = async () => {
-    // First check if a file is selected
     if (!selectedFile) {
       toast({
         title: "File tidak ditemukan",
@@ -210,11 +209,7 @@ export default function ExportJournal() {
       });
       return;
     }
-
-    // Start the upload process
     setIsUploading(true);
-
-    // Check if user is authenticated
     const token = localStorage.getItem("signal_auth_token");
     if (!token) {
       toast({
@@ -227,148 +222,46 @@ export default function ExportJournal() {
       }, 1500);
       return;
     }
-    setIsUploading(true);
-
-    let fileContent = "";
-    let fileMetadata = {};
-
     try {
-      // Verifikasi jenis file untuk menentukan metode pembacaan
-      const fileExt = selectedFile.name
-        .substring(selectedFile.name.lastIndexOf("."))
-        .toLowerCase();
-
-      // Jika berkas PDF, DOC, atau DOCX
-      if ([".pdf", ".doc", ".docx"].includes(fileExt)) {
-        try {
-          // Untuk file binary, baca sebagai ArrayBuffer
-          const arrayBuffer = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (e) => reject(e);
-            reader.readAsArrayBuffer(selectedFile);
-          });
-
-          // Konversi ArrayBuffer ke Base64
-          const bytes = new Uint8Array(arrayBuffer);
-          let binary = "";
-          for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-
-          // Simpan sebagai base64 untuk konten file
-          fileContent = window.btoa(binary);
-          console.log(
-            `File binary ${fileExt} berhasil dibaca dan dikonversi ke base64`
-          );
-          console.log(`Base64 content length: ${fileContent.length}`);
-          // Tambahkan metadata file yang akan dikirim bersama konten
-          Object.assign(fileMetadata, {
-            filename: selectedFile.name,
-            fileType: fileExt.substring(1), // hapus titik di awal
-            fileSize: selectedFile.size,
-            uploadedAt: new Date().toISOString(),
-          });
-        } catch (readError) {
-          console.error("Error reading binary file:", readError);
-          toast({
-            title: "Error",
-            description:
-              "Gagal membaca file binary. File mungkin rusak atau tidak didukung.",
-            variant: "destructive",
-          });
-          setIsUploading(false);
-          return;
-        }
-      } else {
-        // Untuk file teks biasa, baca kontennya
-        try {
-          fileContent = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (e) => reject(e);
-            reader.readAsText(selectedFile);
-          });
-        } catch (readError) {
-          console.error("Error reading file:", readError);
-          toast({
-            title: "Error",
-            description:
-              "Gagal membaca file. File mungkin rusak atau tidak didukung.",
-            variant: "destructive",
-          });
-          setIsUploading(false);
-          return;
-        }
-      }
-
-      // Validasi konten file
-      if (!fileContent || fileContent.trim() === "") {
-        toast("File yang diunggah kosong atau tidak berisi konten yang valid.");
+      // Validasi hanya file PDF
+      if (
+        selectedFile.type !== "application/pdf" &&
+        !selectedFile.name.toLowerCase().endsWith(".pdf")
+      ) {
+        toast({
+          title: "Format file tidak didukung",
+          description: "Hanya file PDF yang dapat diupload.",
+          variant: "destructive",
+        });
         setIsUploading(false);
         return;
       }
-
-      // Log untuk debugging
-      console.log("File content length:", fileContent.length);
-
-      const token = localStorage.getItem("signal_auth_token");
-      if (!token) {
-        toast("Sesi login Anda telah berakhir. Silakan login kembali.");
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 1500);
-        return;
-      }
-      console.log(
-        "Sending request to API with token:",
-        token.substring(0, 10) + "..."
-      );
-
-      const response = await fetch("/api/journal/create", {
+      // Siapkan FormData
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("title", selectedFile.name.replace(/\.[^/.]+$/, ""));
+      // Kirim ke endpoint upload
+      const response = await fetch("/api/journal/upload", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          title: selectedFile.name.replace(/\.[^/.]+$/, ""),
-          content: fileContent,
-          metadata: fileMetadata,
-        }),
+        body: formData,
       });
-
-      console.log("API response status:", response.status);
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("API error response:", errorText);
-
-        let errorData;
+        let errorMsg = "Gagal mengunggah jurnal.";
         try {
-          errorData = JSON.parse(errorText);
-          console.log("Parsed error data:", errorData);
-        } catch (e) {
-          console.error("Error parsing JSON response:", e);
-          errorData = {
-            error:
-              "Tidak dapat memproses respons dari server: " +
-              errorText.substring(0, 100),
-          };
-        }
-
-        throw new Error(
-          errorData.error ||
-            "Gagal mengunggah jurnal - Status: " + response.status
-        );
+          const errorData = JSON.parse(errorText);
+          errorMsg = errorData.error || errorMsg;
+        } catch {}
+        throw new Error(errorMsg);
       }
       const data = await response.json();
-      console.log("Success response data:", data);
-      // Validasi data yang diterima dari server
       if (!data || !data.id) {
         throw new Error("Data respons dari server tidak lengkap");
       }
-
-      // Create a temporary journal entry for immediate UI feedback
+      // Update UI
       const newJournal = {
         id: data.id,
         title: data.title,
@@ -376,19 +269,15 @@ export default function ExportJournal() {
         date: new Date(data.createdAt || Date.now())
           .toISOString()
           .split("T")[0],
-      }; // Immediately update state with optimistic UI
+      };
       setJournals([newJournal, ...journals]);
       setSelectedFile(null);
       setShowUploadDialog(false);
-
-      // Show success notification with better formatting
       toast({
         title: "Sukses",
         description: "Jurnal berhasil diunggah ke database.",
         variant: "success",
       });
-
-      // Fetch fresh data from server to ensure consistency
       await fetchJournals();
     } catch (error) {
       console.error("Error during upload:", error);
