@@ -9,9 +9,7 @@ import { useAuth } from "./auth-provider";
 import { useRouter } from "next/navigation";
 import { useToast } from "../hooks/use-toast";
 import { Shield, Save, FileDown, Database, Check } from "lucide-react";
-import PrivateKeyModal from "./private-key-modal-new";
 import SignaturePreviewModal from "./signature-preview-modal";
-import SignatureResultModal from "./signature-result-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,34 +29,24 @@ import { getAuthHeaders } from "@/lib/api";
 export default function CreateJournal() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [showResultModal, setShowResultModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [signatureData, setSignatureData] = useState(null);
+  const [pendingSignJournalId, setPendingSignJournalId] = useState(null);
   const { user } = useAuth();
   const router = useRouter();
   const { addToast: toast } = useToast();
 
-  // Success dialog state
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [dialogMessage, setDialogMessage] = useState({
-    title: "",
-    description: "",
-    redirectTo: "",
-  });
   const handleSave = async () => {
     if (!title || !content) return;
 
     try {
-      setIsSaving(true); // Call API to save draft (without signature)
+      setIsSaving(true);
       const response = await fetch("/api/journal/create", {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
           title,
           content,
-          // For drafts, we pass empty signature and publicKey
           signature: "",
           publicKey: "",
         }),
@@ -67,15 +55,11 @@ export default function CreateJournal() {
         const errorText = await response.text();
         let errorMessage = "Failed to save draft";
         let errorDetails = "";
-
         try {
-          // Try to parse the error response as JSON
           if (errorText && errorText.trim().startsWith("{")) {
             const errorData = JSON.parse(errorText);
             if (errorData.error) {
               errorMessage = errorData.error;
-
-              // Add more detailed information for specific errors
               if (errorData.error.includes("Unauthorized")) {
                 errorDetails =
                   "Your session may have expired. Please log in again.";
@@ -89,37 +73,13 @@ export default function CreateJournal() {
           console.error("Error parsing error response:", e);
           errorDetails = "Unexpected server response format.";
         }
-
         console.error("Server response:", errorText);
         throw new Error(
           `${errorMessage}${errorDetails ? ` - ${errorDetails}` : ""}`
         );
       }
-      const savedJournal = await response.json();
-
-      // Tampilkan dialog sukses
-      setDialogMessage({
-        title: "Draft Berhasil Disimpan",
-        description:
-          "Jurnal Anda telah berhasil disimpan sebagai draft di database.",
-        redirectTo: "/dashboard",
-      });
-      setShowSuccessDialog(true);
-
-      // Toast notification tetap ditampilkan
-      toast({
-        title: "Draft disimpan",
-        description:
-          "Jurnal Anda telah berhasil disimpan sebagai draft di database.",
-        variant: "success", // Use success variant for better visibility
-      });
-
-      // Redirect to dashboard after a delay (if dialog is closed)
-      setTimeout(() => {
-        if (!showSuccessDialog) {
-          router.push("/dashboard");
-        }
-      }, 2000);
+      // Jika sukses, langsung redirect ke halaman daftar jurnal (upload/export)
+      router.push("/export");
     } catch (error) {
       console.error("Error saving draft:", error);
       toast({
@@ -170,9 +130,40 @@ export default function CreateJournal() {
       });
     }
   };
-  const handleSignRequest = () => {
+  const handleSignRequest = async () => {
     if (!title || !content) return;
-    setShowPreviewModal(true);
+    setIsSaving(true);
+    try {
+      // Simpan draft dulu, dapatkan ID
+      const response = await fetch("/api/journal/create", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title,
+          content,
+          signature: "",
+          publicKey: "",
+        }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          errorText || "Gagal menyimpan draft sebelum tanda tangan"
+        );
+      }
+      const savedJournal = await response.json();
+      // Setelah draft tersimpan, langsung redirect ke halaman tanda tangan
+      window.location.href = `/tandatangani?id=${savedJournal.id}`;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error.message || "Gagal menyimpan draft sebelum tanda tangan.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleContinueToSign = () => {
@@ -180,66 +171,34 @@ export default function CreateJournal() {
     setShowPrivateKeyModal(true);
   };
   const handleSign = async (signData) => {
-    if (!title || !content) return;
+    if (!title || !content || !pendingSignJournalId) return;
     const { privateKey, publicKey, subject, passHash } = signData;
-
     try {
-      // Import ECDSA sign function from our crypto library
       const { sign } = await import("@/lib/crypto/client-ecdsa");
-
-      // Generate signature using private key
       const signature = await sign(content, privateKey);
-
-      // Call API to create signed journal
-      const response = await fetch("/api/journal/create", {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          title,
-          content,
-          subject,
-          signature,
-          publicKey,
-          passHash, // For server-side hashing if needed
-        }),
-      });
-
+      const response = await fetch(
+        `/api/journal/${pendingSignJournalId}/sign`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            signature,
+            publicKey,
+            subject,
+            passHash,
+          }),
+        }
+      );
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save signed journal");
+        throw new Error(errorData.error || "Gagal menandatangani jurnal");
       }
-
-      const savedJournal = await response.json();
-
-      // Set data untuk modal hasil tanda tangan
-      setSignatureData({
-        title,
-        subject,
-        content,
-        signature,
-        publicKey,
-        signer: user?.name || "Anda",
-        timestamp: new Date().toISOString(),
-        journalId: savedJournal.id,
-      });
-
-      // Toast notification tetap ditampilkan
-      toast({
-        title: "Jurnal ditandatangani",
-        description:
-          "Jurnal Anda telah berhasil ditandatangani dengan ECDSA P-256.",
-        variant: "success",
-      });
-
-      // Langsung arahkan ke halaman tandatangani dengan ID jurnal yang baru dibuat
-      window.location.href = `/tandatangani?id=${savedJournal.id}`;
+      // Setelah sukses, redirect ke halaman validasi atau dashboard
+      window.location.href = `/validasi?id=${pendingSignJournalId}&signed=true`;
     } catch (error) {
-      console.error("Error signing journal:", error);
       toast({
         title: "Error",
-        description:
-          error.message ||
-          "Gagal menandatangani jurnal. Periksa kunci privat Anda.",
+        description: error.message || "Gagal menandatangani jurnal.",
         variant: "destructive",
       });
     }
@@ -337,13 +296,6 @@ export default function CreateJournal() {
           </Button>
         </div>
       </div>
-      <PrivateKeyModal
-        isOpen={showPrivateKeyModal}
-        onClose={() => setShowPrivateKeyModal(false)}
-        onSign={handleSign}
-        title="Tanda Tangani Jurnal"
-        journalInfo={{ title, content }}
-      />
       <SignaturePreviewModal
         isOpen={showPreviewModal}
         onClose={() => setShowPreviewModal(false)}
@@ -352,31 +304,6 @@ export default function CreateJournal() {
         content={content}
       />{" "}
       {/* SignatureResultModal removed as we directly redirect to the signing page */}
-      {/* Success Dialog for Draft Save */}
-      <Dialog
-        open={showSuccessDialog}
-        onOpenChange={(open) => {
-          setShowSuccessDialog(open);
-          if (!open && dialogMessage.redirectTo) {
-            router.push(dialogMessage.redirectTo);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-emerald-600">
-              <Check className="h-6 w-6" />
-              {dialogMessage.title}
-            </DialogTitle>
-            <DialogDescription>{dialogMessage.description}</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center">
-            <div className="animate-pulse text-emerald-600 mt-2">
-              {dialogMessage.redirectTo && "Mengalihkan ke dashboard..."}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

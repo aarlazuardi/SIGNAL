@@ -60,6 +60,9 @@ export default function VerifyJournal() {
         sessionStorage.getItem("signal_auth_token");
       if (!token) {
         toast("Sesi login Anda telah berakhir. Silakan login kembali.");
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
         return;
       }
 
@@ -68,6 +71,14 @@ export default function VerifyJournal() {
           Authorization: `Bearer ${token}`,
         },
       });
+
+      if (response.status === 401) {
+        toast("Sesi login Anda telah berakhir. Silakan login kembali.");
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
 
       if (response.ok) {
         const journal = await response.json();

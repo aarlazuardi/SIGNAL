@@ -1,8 +1,16 @@
 /**
  * Utilitas PDF untuk penandatanganan dokumen (CommonJS version)
  */
-const { PDFDocument, PDFName, PDFString, PDFDict, PDFArray, StandardFonts, rgb } = require("pdf-lib");
-const crypto = require('crypto');
+const {
+  PDFDocument,
+  PDFName,
+  PDFString,
+  PDFDict,
+  PDFArray,
+  StandardFonts,
+  rgb,
+} = require("pdf-lib");
+const crypto = require("crypto");
 
 // Constants for metadata and signature
 const PDF_METADATA_KEY = "X-Signal-Metadata-JSON";
@@ -37,7 +45,10 @@ function createHash(content, format = "hex") {
 
     const result = hash.digest(format);
     console.log(
-      `[HASH] Created ${format} hash (first 10 chars): ${result.substring(0, 10)}...`
+      `[HASH] Created ${format} hash (first 10 chars): ${result.substring(
+        0,
+        10
+      )}...`
     );
     return result;
   } catch (error) {
@@ -62,7 +73,10 @@ function createPdfHash(pdfBytes, format = "hex") {
 
     const result = hash.digest(format);
     console.log(
-      `[PDF_HASH] Generated ${format} hash (first 15 chars): ${result.substring(0, 15)}...`
+      `[PDF_HASH] Generated ${format} hash (first 15 chars): ${result.substring(
+        0,
+        15
+      )}...`
     );
     return result;
   } catch (error) {
@@ -131,7 +145,11 @@ async function signPdf(pdfBytes, signatureData) {
     } = signatureData;
 
     if (!signature || !publicKey) {
-      throw new Error("Tanda tangan atau kunci publik tidak ditemukan.");
+      // Jika signature/publicKey tidak ada, generate PDF draft saja tanpa metadata signature
+      // Simpan PDF tanpa metadata signature
+      const draftPdfBytes = await pdfDoc.save();
+      console.log("[SIGN] Generated draft PDF (tanpa signature)");
+      return draftPdfBytes;
     }
     // 7. Simpan metadata tanda tangan di PDF
     const signMetadata = {
@@ -147,7 +165,7 @@ async function signPdf(pdfBytes, signatureData) {
 
     // Serialize metadata untuk penyimpanan
     const metadataString = JSON.stringify(signMetadata);
-    
+
     // Set standard metadata
     pdfDoc.setTitle(perihal || "Dokumen Digital SIGNAL");
     pdfDoc.setAuthor(author || "SIGNAL User");
@@ -160,10 +178,12 @@ async function signPdf(pdfBytes, signatureData) {
     try {
       // FIXED: ALWAYS use array for setKeywords to avoid TypeError
       pdfDoc.setKeywords([metadataString]);
-      console.log("[SIGN] Successfully set Keywords as array with metadata string");
+      console.log(
+        "[SIGN] Successfully set Keywords as array with metadata string"
+      );
     } catch (keywordsErr) {
       console.error("[SIGN] Keywords method failed:", keywordsErr.message);
-      
+
       // Fallback: Try manual method if setKeywords fails
       try {
         // Create a keywords array with a single item
@@ -191,7 +211,10 @@ async function signPdf(pdfBytes, signatureData) {
           console.log("[SIGN] Set Keywords manually using direct property");
         }
       } catch (manualErr) {
-        console.error("[SIGN] Manual Keywords setting failed:", manualErr.message);
+        console.error(
+          "[SIGN] Manual Keywords setting failed:",
+          manualErr.message
+        );
       }
     }
 
@@ -214,7 +237,7 @@ async function signPdf(pdfBytes, signatureData) {
     // Save the signed document
     const signedPdfBytes = await pdfDoc.save();
     console.log("[SIGN] PDF successfully signed and saved");
-    
+
     return signedPdfBytes;
   } catch (error) {
     console.error("[SIGN] Error signing PDF document:", error);
