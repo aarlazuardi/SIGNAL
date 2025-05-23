@@ -6,7 +6,13 @@ export default function AboutPage() {
           Tentang SIGNAL
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
-          Platform penandatanganan jurnal digital dengan algoritma ECDSA P-256
+          SIGNAL (Secure Integrity-Guarded Journal menggunakan ECDSA P-256)
+          merupakan platform penandatanganan jurnal digital dengan algoritma
+          ECDSA P-256. Platform ini menyediakan antarmuka intuitif bagi penulis
+          untuk menandatangani dan memverifikasi jurnal mereka secara real-time.
+          Selain itu, SIGNAL mendukung integrasi mudah dengan sistem manajemen
+          dokumen yang sudah ada, sehingga memudahkan adopsi di berbagai
+          lingkungan akademik dan korporat.
         </p>
       </div>
 
@@ -117,10 +123,10 @@ export default function AboutPage() {
         <section>
           <h2 className="mb-3 sm:mb-4 text-xl sm:text-2xl font-bold">
             Hubungi Kami
-          </h2>{" "}
+          </h2>
           <p className="text-sm sm:text-base text-muted-foreground">
             Jika Anda memiliki pertanyaan atau ingin mengetahui lebih lanjut
-            tentang SIGNAL, jangan ragu untuk menghubungi kami di
+            tentang SIGNAL, jangan ragu untuk menghubungi kami di{" "}
             <a
               href="mailto:info@signal-platform.com"
               className="text-emerald-600 hover:underline"
