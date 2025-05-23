@@ -43,3 +43,6 @@ api-docs.md
 docs/
 CONTRIBUTING.md
 NEXT_FEATURES.md
+
+# ignore extract-db-url.js
+extract-db-url.js
