@@ -106,25 +106,17 @@ export default function ExportJournal() {
   const fetchJournals = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("signal_auth_token");
-
-      if (!token) {
-        toast({
-          title: "Error",
-          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 1500);
-        return;
-      }
-
-      const response = await fetch("/api/journal/mine", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      
+      // Import fungsi yang lebih robust
+      const { fetchWithAuth } = await import("@/lib/api");
+      
+      // Gunakan fetchWithAuth untuk handle token dan retry
+      const response = await fetchWithAuth(
+        "/api/journal/mine",
+        { method: "GET" },
+        true,  // tunggu token
+        2      // retry 2x
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -272,14 +264,24 @@ export default function ExportJournal() {
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("title", selectedFile.name.replace(/\.[^/.]+$/, ""));
-      // Kirim ke endpoint upload
-      const response = await fetch("/api/journal/upload", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      
+      // Import fungsi fetchWithAuth yang lebih robust
+      const { fetchWithAuth } = await import("@/lib/api");
+      
+      // Kirim ke endpoint upload dengan fetchWithAuth yang lebih robust
+      // Catatan: Untuk FormData, jangan sertakan Content-Type di headers
+      const response = await fetchWithAuth(
+        "/api/journal/upload",
+        {
+          method: "POST",
+          headers: {
+            // Jangan sertakan Content-Type untuk FormData
+          },
+          body: formData,
         },
-        body: formData,
-      });
+        true,  // tunggu token
+        2      // retry 2x
+      );
       if (!response.ok) {
         const errorText = await response.text();
         let errorMsg = "Gagal mengunggah jurnal.";
@@ -362,13 +364,16 @@ export default function ExportJournal() {
 
       // Generate signature using the provided private key
       const { sign } = await import("@/lib/crypto/client-ecdsa");
+      
+      // Import fungsi fetchWithAuth yang lebih robust
+      const { fetchWithAuth } = await import("@/lib/api");
 
-      // Fetch journal content to sign
-      const journalResponse = await fetch(
-        `/api/journal/${selectedJournal.id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      // Fetch journal content to sign dengan fetchWithAuth yang lebih robust
+      const journalResponse = await fetchWithAuth(
+        `/api/journal/${selectedJournal.id}`, 
+        { method: "GET" },
+        true,  // tunggu token tersedia
+        2      // retry max 2x jika error 401
       );
 
       if (!journalResponse.ok) {
@@ -393,22 +398,20 @@ export default function ExportJournal() {
 
       console.log("Signing journal with metadata:", signatureMetadata);
 
-      // Send signature to backend (no pdfHash)
-      const updateResponse = await fetch(
+      // Send signature to backend menggunakan fetchWithAuth yang lebih robust
+      const updateResponse = await fetchWithAuth(
         `/api/journal/${selectedJournal.id}/sign`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify({
             signature,
             publicKey,
             passHash,
             metadata: signatureMetadata,
           }),
-        }
+        },
+        true,  // tunggu token tersedia
+        2      // retry max 2x jika error 401
       );
 
       if (!updateResponse.ok) {

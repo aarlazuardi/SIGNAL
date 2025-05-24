@@ -31,9 +31,14 @@ export async function auth(request) {
   try {
     // Periksa header Authorization
     const authHeader = request.headers.get("authorization");
+    console.log(`[AUTH] Authorization header: ${authHeader ? 'Present' : 'Missing'}`);
+
+    // Debug headers untuk pemecahan masalah
+    // console.log('[AUTH] Request headers:', Object.fromEntries([...request.headers.entries()]));
 
     // Jika header tidak ada atau tidak dimulai dengan 'Bearer '
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.log('[AUTH] Missing or invalid Authorization header format');
       return NextResponse.json(
         { error: "Unauthorized - Token tidak ada" },
         { status: 401 }
@@ -42,12 +47,15 @@ export async function auth(request) {
 
     // Ambil token dari header
     const token = authHeader.split(" ")[1];
+    console.log(`[AUTH] Token found, length: ${token.length}, starts with: ${token.substring(0, 10)}...`);
 
     // Verifikasi token
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log(`[AUTH] Token verified successfully for user: ${decoded.userId}`);
     } catch (error) {
+      console.error(`[AUTH] Token verification failed:`, error.message);
       return NextResponse.json(
         { error: "Unauthorized - Token tidak valid" },
         { status: 401 }

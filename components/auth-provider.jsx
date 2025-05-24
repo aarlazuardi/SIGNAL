@@ -78,22 +78,37 @@ export function AuthProvider({ children }) {
     const MAX_POLLS = 50; // 50 x 200ms = 10 detik total polling
 
     if (status === "authenticated" && session?.customToken) {
-      // Coba simpan token dengan berbagai metode (redundant untuk keamanan)
+      // Selalu simpan token baru dari session
+      const tokenToSave = session.customToken;
+
+      // Log informasi token untuk debugging
+      console.log(
+        `[AuthProvider] Session token update - Length: ${tokenToSave.length}, Start: ${tokenToSave.substring(
+          0,
+          10
+        )}...`
+      );
+
+      // Force hapus token lama untuk memastikan tidak ada token invalid yang tetap tersimpan
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("signal_auth_token");
+      }
 
       // Metode 1: Gunakan setAuthToken dari api.js
-      const currentToken = getAuthToken();
-      if (currentToken !== session.customToken) {
-        setAuthToken(session.customToken);
-        console.log(
-          "[AuthProvider] customToken ditulis ke localStorage (metode 1)"
-        );
-      }
+      setAuthToken(tokenToSave);
+      console.log("[AuthProvider] customToken ditulis ke localStorage (metode 1)");
 
       // Metode 2: Tulis langsung ke localStorage untuk keamanan tambahan
       if (typeof window !== "undefined") {
-        window.localStorage.setItem("signal_auth_token", session.customToken);
+        // Tambahkan juga timestamp untuk menandai saat token diperbarui
+        const tokenTimestamp = new Date().getTime();
+        window.localStorage.setItem("signal_auth_token", tokenToSave);
+        window.localStorage.setItem(
+          "signal_auth_token_timestamp",
+          tokenTimestamp.toString()
+        );
         console.log(
-          "[AuthProvider] customToken ditulis ke localStorage (metode 2 langsung)"
+          `[AuthProvider] customToken ditulis ke localStorage (metode 2 langsung) - timestamp: ${tokenTimestamp}`
         );
       }
 
@@ -102,18 +117,18 @@ export function AuthProvider({ children }) {
         pollingCounter++;
         const tokenNow = getAuthToken();
 
-        if (tokenNow !== session.customToken) {
+        if (tokenNow !== tokenToSave) {
           // Coba lagi kedua metode
-          setAuthToken(session.customToken);
+          setAuthToken(tokenToSave);
           if (typeof window !== "undefined") {
+            const tokenTimestamp = new Date().getTime();
+            window.localStorage.setItem("signal_auth_token", tokenToSave);
             window.localStorage.setItem(
-              "signal_auth_token",
-              session.customToken
+              "signal_auth_token_timestamp",
+              tokenTimestamp.toString()
             );
           }
-          console.log(
-            `[AuthProvider] customToken ditulis ke localStorage (polling #${pollingCounter})`
-          );
+          console.log(`[AuthProvider] customToken ditulis ke localStorage (polling #${pollingCounter})`);
         } else {
           console.log(
             `[AuthProvider] customToken berhasil tersimpan di localStorage setelah ${pollingCounter} kali polling`
@@ -125,7 +140,7 @@ export function AuthProvider({ children }) {
         if (pollingCounter >= MAX_POLLS) {
           console.log(
             `[AuthProvider] Batas polling tercapai (${MAX_POLLS}). Status token: ${
-              getAuthToken() === session.customToken ? "berhasil" : "gagal"
+              getAuthToken() === tokenToSave ? "berhasil" : "gagal"
             }`
           );
           clearInterval(pollingInterval);
