@@ -64,6 +64,8 @@ export default function ExportJournal() {
   const [isUploading, setIsUploading] = useState(false);
   const [signedPdfUrl, setSignedPdfUrl] = useState(null);
   const [showSignedPdfModal, setShowSignedPdfModal] = useState(false);
+  const [tokenReady, setTokenReady] = useState(false);
+  const [loadingToken, setLoadingToken] = useState(true);
 
   // Check if user is authenticated when component mounts
   useEffect(() => {
@@ -77,6 +79,27 @@ export default function ExportJournal() {
       // Redirect to login page
       window.location.href = "/login";
     }
+  }, []);
+
+  // Token readiness check
+  useEffect(() => {
+    let interval;
+    function checkToken() {
+      const token = localStorage.getItem("signal_auth_token");
+      if (token) {
+        setTokenReady(true);
+        setLoadingToken(false);
+        if (interval) clearInterval(interval);
+      } else {
+        setTokenReady(false);
+        setLoadingToken(true);
+      }
+    }
+    checkToken();
+    if (!tokenReady) {
+      interval = setInterval(checkToken, 200);
+    }
+    return () => interval && clearInterval(interval);
   }, []);
 
   // Function to fetch journals
@@ -169,10 +192,10 @@ export default function ExportJournal() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && tokenReady) {
       fetchJournals();
     }
-  }, [user]);
+  }, [user, tokenReady]);
   const handleFileChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
@@ -573,6 +596,16 @@ export default function ExportJournal() {
     }
   };
 
+  if (loadingToken) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg text-muted-foreground">
+          Memuat sesi autentikasi...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container py-8">
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
@@ -878,7 +911,7 @@ export default function ExportJournal() {
                 className="bg-emerald-600 hover:bg-emerald-700"
                 onClick={() => {
                   setShowSignedPdfModal(false);
-                  // Optionally, redirect to validation page
+                  // Optionally, redirect to validasi page
                   window.location.href = "/validasi";
                 }}
               >

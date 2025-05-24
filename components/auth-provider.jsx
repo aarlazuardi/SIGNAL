@@ -71,6 +71,41 @@ export function AuthProvider({ children }) {
     }
   }, [session?.customToken, status]);
 
+  // Pastikan customToken dari session NextAuth selalu disimpan ke localStorage, dengan polling jika perlu
+  useEffect(() => {
+    let pollingInterval;
+    if (status === "authenticated" && session?.customToken) {
+      const currentToken = getAuthToken();
+      if (currentToken !== session.customToken) {
+        setAuthToken(session.customToken);
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            "[AuthProvider] customToken ditulis ke localStorage (langsung)"
+          );
+        }
+      }
+      // Polling untuk memastikan token benar-benar tersimpan (mengatasi race condition/hydration)
+      pollingInterval = setInterval(() => {
+        const tokenNow = getAuthToken();
+        if (tokenNow !== session.customToken) {
+          setAuthToken(session.customToken);
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              "[AuthProvider] customToken ditulis ke localStorage (polling)"
+            );
+          }
+        } else {
+          clearInterval(pollingInterval);
+        }
+      }, 200); // polling setiap 200ms, stop jika sudah sama
+      // Stop polling setelah 2 detik untuk mencegah infinite loop
+      setTimeout(() => clearInterval(pollingInterval), 2000);
+    }
+    return () => {
+      if (pollingInterval) clearInterval(pollingInterval);
+    };
+  }, [session?.customToken, status]);
+
   const login = async (email, password) => {
     try {
       const response = await loginUser({ email, password });
