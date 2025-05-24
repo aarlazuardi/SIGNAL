@@ -50,13 +50,13 @@ export const authOptions = {
     async signIn({ user, account, profile }) {
       // Jika login dengan Google, cek apakah user sudah ada di DB
       if (account?.provider === "google") {
-        const existingUser = await prisma.user.findUnique({
+        let existingUser = await prisma.user.findUnique({
           where: { email: user.email },
         });
 
         if (!existingUser) {
           // Buat user baru untuk login Google
-          await prisma.user.create({
+          existingUser = await prisma.user.create({
             data: {
               email: user.email,
               name: user.name || "Google User",
@@ -65,16 +65,22 @@ export const authOptions = {
             },
           });
         }
+        // Pastikan user.id diisi dari database
+        user.id = existingUser.id;
       }
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      // Jika login baru (user ada), tambahkan data user ke token
       if (user) {
-        // Saat login berhasil, tambahkan data user ke token
-        token.userId = user.id;
+        // Ambil user dari database (pastikan id selalu ada)
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email },
+        });
+        token.userId = dbUser?.id || user.id;
         // Buat JWT kustom dengan JWT_SECRET dari .env
         token.customToken = jwt.sign(
-          { userId: user.id },
+          { userId: token.userId },
           process.env.JWT_SECRET || "fallback-secret",
           { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
         );
@@ -83,7 +89,7 @@ export const authOptions = {
     },
     async session({ session, token }) {
       // Tambahkan userId dan custom token ke sesi
-      session.user.id = token.userId;
+      session.user.id = token.userId || null;
       session.customToken = token.customToken;
       return session;
     },

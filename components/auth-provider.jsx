@@ -65,12 +65,20 @@ export function AuthProvider({ children }) {
   }, [session?.customToken, status]);
 
   useEffect(() => {
-    // Pastikan customToken dari session NextAuth selalu disimpan ke localStorage
+    // Logging untuk debug token Google
+    if (status === "authenticated") {
+      console.log("[AuthProvider] NextAuth session:", session);
+    }
+    // Pastikan customToken dari session NextAuth selalu disimpan ke localStorage/sessionStorage
     if (status === "authenticated" && session?.customToken) {
+      console.log(
+        "[AuthProvider] Menyimpan customToken ke storage:",
+        session.customToken
+      );
       // Variabel untuk tracking polling
       let pollingInterval;
       let pollingAttempts = 0;
-      const MAX_POLLS = 10; // 10 x 50ms = 500ms total polling
+      const MAX_POLLS = 40; // 40 x 50ms = 2 detik total polling
       const POLL_INTERVAL = 50; // 50ms interval
 
       // Fungsi untuk simpan token ke localStorage dan sessionStorage
@@ -79,7 +87,7 @@ export function AuthProvider({ children }) {
         if (typeof window !== "undefined") {
           sessionStorage.setItem("auth_method", "google");
         }
-        setAuthToken(tokenToSave);
+        setAuthToken(tokenToSave); // localStorage
         if (typeof window !== "undefined") {
           sessionStorage.setItem("signal_auth_token", tokenToSave);
           sessionStorage.setItem(
@@ -87,8 +95,13 @@ export function AuthProvider({ children }) {
             Date.now().toString()
           );
         }
+        // Logging
+        console.log(
+          "[AuthProvider] Token disimpan ke localStorage & sessionStorage:",
+          tokenToSave
+        );
       };
-      persistToken();
+
       // Polling untuk memastikan token tersimpan
       const verifyTokenStored = () => {
         pollingAttempts++;
@@ -122,24 +135,12 @@ export function AuthProvider({ children }) {
           persistToken();
         } else {
           clearInterval(pollingInterval);
-          if (typeof window !== "undefined" && session?.customToken) {
-            try {
-              document.cookie = `signal_auth_token=${session.customToken};path=/;max-age=3600`;
-              sessionStorage.setItem("auth_reload_attempted", "true");
-              setIsAuthenticated(true);
-              setUser({
-                id: session.user.id,
-                name: session.user.name,
-                email: session.user.email,
-                authSource: "google",
-              });
-              setLoading(false);
-            } catch (e) {
-              console.error("Failed to save token as cookie:", e);
-            }
-          }
+          console.warn(
+            "[AuthProvider] Gagal menyimpan token ke storage setelah polling"
+          );
         }
       };
+      persistToken();
       pollingInterval = setInterval(verifyTokenStored, POLL_INTERVAL);
       return () => {
         if (pollingInterval) clearInterval(pollingInterval);
