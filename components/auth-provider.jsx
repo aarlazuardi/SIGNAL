@@ -64,79 +64,51 @@ export function AuthProvider({ children }) {
     fetchUser();
   }, [session?.customToken, status]);
 
-  // Pastikan customToken dari session NextAuth selalu disimpan ke localStorage
   useEffect(() => {
-    if (status === "authenticated" && session?.customToken) {
-      setAuthToken(session.customToken);
-    }
-  }, [session?.customToken, status]);
-
-  // Pastikan customToken dari session NextAuth selalu disimpan ke localStorage, dengan polling yang optimal
-  useEffect(() => {
+    // Pastikan customToken dari session NextAuth selalu disimpan ke localStorage
     if (status === "authenticated" && session?.customToken) {
       // Variabel untuk tracking polling
       let pollingInterval;
       let pollingAttempts = 0;
-      const MAX_POLLS = 10; // 10 x 50ms = 500ms total polling (lebih singkat untuk UX lebih cepat)
-      const POLL_INTERVAL = 50; // 50ms interval (lebih responsif)
+      const MAX_POLLS = 10; // 10 x 50ms = 500ms total polling
+      const POLL_INTERVAL = 50; // 50ms interval
 
-      // Fungsi untuk simpan token ke localStorage dan sessionStorage (redundansi untuk keandalan)
+      // Fungsi untuk simpan token ke localStorage dan sessionStorage
       const persistToken = () => {
         const tokenToSave = session.customToken;
-
-        // Catat sumber login
         if (typeof window !== "undefined") {
           sessionStorage.setItem("auth_method", "google");
         }
-
-        // Gunakan API function untuk simpan token (single source of truth)
         setAuthToken(tokenToSave);
-
-        // Simpan juga di sessionStorage untuk redundansi
         if (typeof window !== "undefined") {
           sessionStorage.setItem("signal_auth_token", tokenToSave);
-          // Set timestamp untuk tracking
           sessionStorage.setItem(
             "signal_auth_token_timestamp",
             Date.now().toString()
           );
         }
       };
-
-      // Panggil sekali di awal
       persistToken();
-
-      // Fungsi polling untuk memverifikasi token tersimpan
+      // Polling untuk memastikan token tersimpan
       const verifyTokenStored = () => {
         pollingAttempts++;
-
         const storedToken =
           localStorage.getItem("signal_auth_token") ||
           sessionStorage.getItem("signal_auth_token");
-
-        // Token sudah tersedia dan sama dengan session token
         if (storedToken && storedToken === session.customToken) {
-          // Token berhasil tersimpan, stop polling
           clearInterval(pollingInterval);
           setIsAuthenticated(true);
           setUser({
             id: session.user.id,
             name: session.user.name,
             email: session.user.email,
-            // Tambahkan flag sumber otentikasi
             authSource: "google",
           });
           setLoading(false);
-
-          // Set flag ready untuk komponen lain
           window.SIGNAL_AUTH_READY = true;
-
-          // Cek jika ada halaman redirect setelah login
           const redirectPath = sessionStorage.getItem("redirect_after_login");
           if (redirectPath) {
-            // Hapus dari session storage
             sessionStorage.removeItem("redirect_after_login");
-            // Arahkan ke halaman sebelumnya
             if (
               typeof window !== "undefined" &&
               window.location.pathname !== redirectPath
@@ -146,24 +118,14 @@ export function AuthProvider({ children }) {
           }
           return;
         }
-
-        // Token belum tersimpan atau tidak sama, coba tulis ulang
         if (pollingAttempts <= MAX_POLLS) {
           persistToken();
         } else {
-          // Sudah mencapai batas polling, tetap gunakan apa yang tersedia
           clearInterval(pollingInterval);
-
-          // Terakhir coba simpan dengan metode lain jika belum berhasil
           if (typeof window !== "undefined" && session?.customToken) {
             try {
-              // Set as cookie juga sebagai fallback terakhir
               document.cookie = `signal_auth_token=${session.customToken};path=/;max-age=3600`;
-
-              // Set flag untuk coba reload halaman
               sessionStorage.setItem("auth_reload_attempted", "true");
-
-              // Update UI state
               setIsAuthenticated(true);
               setUser({
                 id: session.user.id,
@@ -178,11 +140,7 @@ export function AuthProvider({ children }) {
           }
         }
       };
-
-      // Start polling dengan interval yang lebih singkat
       pollingInterval = setInterval(verifyTokenStored, POLL_INTERVAL);
-
-      // Cleanup
       return () => {
         if (pollingInterval) clearInterval(pollingInterval);
       };

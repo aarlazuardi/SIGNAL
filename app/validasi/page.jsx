@@ -75,17 +75,10 @@ function ValidationPage() {
     setLoading(true);
     console.log("Mengambil data jurnal dengan ID:", id);
     try {
-      // Import fungsi helper untuk menunggu token tersedia
-      const { waitForAuthToken } = await import("@/lib/api");
-
-      // Tunggu token tersedia dengan polling (max 10 detik)
-      const token = await waitForAuthToken(10000);
-
+      const token = localStorage.getItem("signal_auth_token");
       if (!token) {
-        setError(
-          "Tidak dapat menemukan token autentikasi. Silakan login ulang."
-        );
-        console.error("Token tidak ditemukan setelah polling");
+        setError("Sesi login Anda telah berakhir. Silakan login kembali.");
+        console.error("Token tidak ditemukan");
         setTimeout(() => {
           router.push("/login");
         }, 1500);
@@ -145,16 +138,11 @@ function ValidationPage() {
   const handleDownloadPDF = async () => {
     if (!journal) return;
     try {
-      // Import fungsi helper
-      const { waitForAuthToken } = await import("@/lib/api");
-
-      // Tunggu token tersedia dengan polling (max 10 detik)
-      const token = await waitForAuthToken(10000);
-
+      const token = localStorage.getItem("signal_auth_token");
       if (!token) {
         toast({
           title: "Autentikasi diperlukan",
-          description: "Token tidak tersedia. Silakan login kembali.",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
           variant: "destructive",
         });
         setTimeout(() => {

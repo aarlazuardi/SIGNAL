@@ -108,75 +108,19 @@ export async function auth(request) {
  */
 export async function getUserFromToken(request) {
   try {
-    // Periksa header Authorization - validasi cepat
+    // Periksa header Authorization
     const authHeader = request.headers.get("authorization");
-
-    // Jika header tidak ada atau tidak dimulai dengan 'Bearer '
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return null;
     }
-
     // Ambil token dari header
     const token = authHeader.split(" ")[1];
-
-    // Validasi format token dasar untuk gagal cepat
-    if (
-      !token ||
-      token === "undefined" ||
-      token === "null" ||
-      token.split(".").length !== 3
-    ) {
-      return null;
-    }
-
-    // Implementasi cache sederhana untuk token sebelumnya
-    // Menggunakan Map untuk menyimpan hasil dekode token dengan waktu kadaluarsa
-    // Cache global hanya tersedia selama proses server berjalan
-    if (!global.tokenCache) {
-      global.tokenCache = new Map();
-    }
-
-    const now = Date.now();
-    // Cek apakah token sudah ada di cache dan masih valid (cache 30 detik)
-    if (global.tokenCache.has(token)) {
-      const cachedData = global.tokenCache.get(token);
-      // Token cache valid selama 30 detik
-      if (now - cachedData.timestamp < 30000) {
-        return cachedData.user;
-      }
-      // Token cache kadaluarsa, hapus dari cache
-      global.tokenCache.delete(token);
-    }
-
-    // Verifikasi token tanpa logging berlebihan untuk mengurangi overhead
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (jwtError) {
-      return null;
-    }
-
-    // Periksa apakah user masih ada di database dengan select yang lebih efisien
-    // Hanya select field yang penting untuk mempercepat kueri
+    // Verifikasi token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Periksa apakah user masih ada di database
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        publicKey: true,
-        role: true,
-      },
     });
-
-    // Cache hasil untuk 30 detik ke depan
-    if (user) {
-      global.tokenCache.set(token, {
-        user,
-        timestamp: now,
-      });
-    }
-
     return user || null;
   } catch (error) {
     console.error("getUserFromToken error:", error);

@@ -106,25 +106,27 @@ export default function ExportJournal() {
   const fetchJournals = async () => {
     try {
       setLoading(true);
-
-      // Import fungsi yang lebih robust
-      const { fetchWithAuth } = await import("@/lib/api");
-
-      // Gunakan fetchWithAuth untuk handle token dan retry
-      const response = await fetchWithAuth(
-        "/api/journal/mine",
-        { method: "GET" },
-        true, // tunggu token
-        2 // retry 2x
-      );
-
+      const token = localStorage.getItem("signal_auth_token");
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Sesi login Anda telah berakhir. Silakan login kembali.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
+      const response = await fetch("/api/journal/mine", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("API error response:", errorText);
-
         let errorMessage = "Gagal memuat jurnal";
         try {
-          // Hanya parse jika errorText berisi valid JSON
           if (errorText && errorText.trim().startsWith("{")) {
             const errorData = JSON.parse(errorText);
             if (errorData.error) {
@@ -134,44 +136,28 @@ export default function ExportJournal() {
         } catch (e) {
           console.error("Error parsing error response:", e);
         }
-
         throw new Error(errorMessage);
       }
-
       const data = await response.json();
-      console.log("Fetched journals:", data);
-
-      // Verifikasi bahwa data adalah array
       if (!Array.isArray(data)) {
-        console.error("API response is not an array:", data);
         throw new Error("Format data jurnal tidak valid");
       }
-
-      // Transform data untuk menyesuaikan dengan UI
       const formattedJournals = data
         .map((journal) => {
-          // Validasi data jurnal
-          if (!journal || typeof journal !== "object") {
-            console.error("Invalid journal entry:", journal);
-            return null;
-          }
-
+          if (!journal || typeof journal !== "object") return null;
           return {
             id: journal.id || "",
             title: journal.title || "Untitled",
             status: journal.verified ? "signed" : "unsigned",
             date: journal.createdAt
               ? new Date(journal.createdAt).toISOString().split("T")[0]
-              : new Date().toISOString().split("T")[0], // Default ke hari ini jika tidak ada tanggal
-            // Data raw untuk debugging
+              : new Date().toISOString().split("T")[0],
             rawDate: journal.createdAt || "",
           };
         })
-        .filter(Boolean); // Hapus entri yang null
-
+        .filter(Boolean);
       setJournals(formattedJournals);
     } catch (error) {
-      console.error("Error fetching journals:", error);
       toast({
         title: "Error",
         description:
@@ -184,10 +170,10 @@ export default function ExportJournal() {
   };
 
   useEffect(() => {
-    if (user && tokenReady) {
+    if (user) {
       fetchJournals();
     }
-  }, [user, tokenReady]);
+  }, [user]);
   // Tambahkan fungsi helper untuk validasi file yang lebih cepat
   const validateFile = (file) => {
     // Validasi tipe file
@@ -515,15 +501,12 @@ export default function ExportJournal() {
       // Generate signature using the provided private key
       const { sign } = await import("@/lib/crypto/client-ecdsa");
 
-      // Import fungsi fetchWithAuth yang lebih robust
-      const { fetchWithAuth } = await import("@/lib/api");
-
-      // Fetch journal content to sign dengan fetchWithAuth yang lebih robust
-      const journalResponse = await fetchWithAuth(
+      // Fetch journal content to sign
+      const journalResponse = await fetch(
         `/api/journal/${selectedJournal.id}`,
-        { method: "GET" },
-        true, // tunggu token tersedia
-        2 // retry max 2x jika error 401
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
 
       if (!journalResponse.ok) {
@@ -548,20 +531,22 @@ export default function ExportJournal() {
 
       console.log("Signing journal with metadata:", signatureMetadata);
 
-      // Send signature to backend menggunakan fetchWithAuth yang lebih robust
-      const updateResponse = await fetchWithAuth(
+      // Send signature to backend (no pdfHash)
+      const updateResponse = await fetch(
         `/api/journal/${selectedJournal.id}/sign`,
         {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             signature,
             publicKey,
             passHash,
             metadata: signatureMetadata,
           }),
-        },
-        true, // tunggu token tersedia
-        2 // retry max 2x jika error 401
+        }
       );
 
       if (!updateResponse.ok) {

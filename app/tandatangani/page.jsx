@@ -260,22 +260,10 @@ function SignPage() {
 
       // Generate key pair
       const { privateKey, publicKey } = await generateKeyPair();
-
       // Sign the document content
       const signature = await sign(journal.content, privateKey);
-
-      // 4. Kirim ke backend dengan memastikan token tersedia
-      const { waitForAuthToken } = await import("@/lib/api");
-
-      // Tunggu token tersedia dengan polling (max 10 detik)
-      const token = await waitForAuthToken(10000);
-
-      if (!token) {
-        throw new Error(
-          "Tidak dapat menemukan token autentikasi. Silakan login ulang."
-        );
-      }
-
+      // 4. Kirim ke backend
+      const token = localStorage.getItem("signal_auth_token");
       const response = await fetch(`/api/journal/${journalId}/sign`, {
         method: "POST",
         headers: {

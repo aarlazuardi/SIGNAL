@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -32,35 +32,12 @@ export default function CreateJournal() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingSignJournalId, setPendingSignJournalId] = useState(null);
-  const [tokenReady, setTokenReady] = useState(false);
-  const [loadingToken, setLoadingToken] = useState(true);
   const { user } = useAuth();
   const router = useRouter();
   const { addToast: toast } = useToast();
 
-  useEffect(() => {
-    let interval;
-    function checkToken() {
-      const token = localStorage.getItem("signal_auth_token");
-      if (token) {
-        setTokenReady(true);
-        setLoadingToken(false);
-        if (interval) clearInterval(interval);
-      } else {
-        setTokenReady(false);
-        setLoadingToken(true);
-      }
-    }
-    checkToken();
-    if (!tokenReady) {
-      interval = setInterval(checkToken, 200);
-    }
-    return () => interval && clearInterval(interval);
-  }, []);
-
   const handleSave = async () => {
     if (!title || !content) return;
-
     try {
       setIsSaving(true);
       const response = await fetch("/api/journal/create", {
@@ -100,7 +77,6 @@ export default function CreateJournal() {
           `${errorMessage}${errorDetails ? ` - ${errorDetails}` : ""}`
         );
       }
-      // Jika sukses, langsung redirect ke halaman daftar jurnal (upload/export)
       router.push("/export");
     } catch (error) {
       console.error("Error saving draft:", error);
@@ -114,6 +90,7 @@ export default function CreateJournal() {
       setIsSaving(false);
     }
   };
+
   const handleExportFile = (format) => {
     if (!title || !content) {
       toast({
@@ -124,20 +101,14 @@ export default function CreateJournal() {
       });
       return;
     }
-
     try {
-      // Ekspor jurnal ke format file yang dipilih
       exportJournalToFile(title, content, format);
-
-      // Tampilkan dialog sukses
       setDialogMessage({
         title: "Jurnal Berhasil Diekspor",
         description: `Jurnal Anda telah berhasil diekspor ke format ${format.toUpperCase()}.`,
-        redirectTo: "", // Tidak perlu redirect
+        redirectTo: "",
       });
       setShowSuccessDialog(true);
-
-      // Toast notification tetap ditampilkan dengan variant success
       toast({
         title: "Jurnal diekspor",
         description: `Jurnal Anda telah berhasil diekspor ke format ${format.toUpperCase()}.`,
@@ -152,29 +123,14 @@ export default function CreateJournal() {
       });
     }
   };
+
   const handleSignRequest = async () => {
     if (!title || !content) return;
     setIsSaving(true);
     try {
-      // Import fungsi helper untuk menunggu token tersedia
-      const { waitForAuthToken } = await import("@/lib/api");
-
-      // Tunggu token tersedia dengan polling (max 10 detik)
-      const token = await waitForAuthToken(10000);
-
-      if (!token) {
-        throw new Error(
-          "Tidak dapat menemukan token autentikasi. Silakan login ulang."
-        );
-      }
-
-      // Simpan draft dulu, dapatkan ID
       const response = await fetch("/api/journal/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           title,
           content,
@@ -189,7 +145,6 @@ export default function CreateJournal() {
         );
       }
       const savedJournal = await response.json();
-      // Setelah draft tersimpan, langsung redirect ke halaman tanda tangan
       window.location.href = `/tandatangani?id=${savedJournal.id}`;
     } catch (error) {
       toast({
@@ -207,6 +162,7 @@ export default function CreateJournal() {
     setShowPreviewModal(false);
     setShowPrivateKeyModal(true);
   };
+
   const handleSign = async (signData) => {
     if (!title || !content || !pendingSignJournalId) return;
     const { privateKey, publicKey, subject, passHash } = signData;
@@ -230,7 +186,6 @@ export default function CreateJournal() {
         const errorData = await response.json();
         throw new Error(errorData.error || "Gagal menandatangani jurnal");
       }
-      // Setelah sukses, redirect ke halaman validasi atau dashboard
       window.location.href = `/validasi?id=${pendingSignJournalId}&signed=true`;
     } catch (error) {
       toast({
@@ -240,16 +195,6 @@ export default function CreateJournal() {
       });
     }
   };
-
-  if (loadingToken) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-lg text-muted-foreground">
-          Memuat sesi autentikasi...
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="container max-w-4xl py-8">
