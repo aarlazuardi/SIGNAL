@@ -83,10 +83,9 @@ export function AuthProvider({ children }) {
 
       // Log informasi token untuk debugging
       console.log(
-        `[AuthProvider] Session token update - Length: ${tokenToSave.length}, Start: ${tokenToSave.substring(
-          0,
-          10
-        )}...`
+        `[AuthProvider] Session token update - Length: ${
+          tokenToSave.length
+        }, Start: ${tokenToSave.substring(0, 10)}...`
       );
 
       // Force hapus token lama untuk memastikan tidak ada token invalid yang tetap tersimpan
@@ -96,7 +95,9 @@ export function AuthProvider({ children }) {
 
       // Metode 1: Gunakan setAuthToken dari api.js
       setAuthToken(tokenToSave);
-      console.log("[AuthProvider] customToken ditulis ke localStorage (metode 1)");
+      console.log(
+        "[AuthProvider] customToken ditulis ke localStorage (metode 1)"
+      );
 
       // Metode 2: Tulis langsung ke localStorage untuk keamanan tambahan
       if (typeof window !== "undefined") {
@@ -128,7 +129,9 @@ export function AuthProvider({ children }) {
               tokenTimestamp.toString()
             );
           }
-          console.log(`[AuthProvider] customToken ditulis ke localStorage (polling #${pollingCounter})`);
+          console.log(
+            `[AuthProvider] customToken ditulis ke localStorage (polling #${pollingCounter})`
+          );
         } else {
           console.log(
             `[AuthProvider] customToken berhasil tersimpan di localStorage setelah ${pollingCounter} kali polling`

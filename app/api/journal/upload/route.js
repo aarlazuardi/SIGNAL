@@ -7,16 +7,30 @@ import prisma from "@/lib/db/prisma";
 
 export async function POST(request) {
   try {
+    console.log("[Upload API] Received file upload request");
+    
+    // Log headers untuk debugging
+    const headers = Object.fromEntries([...request.headers.entries()]);
+    const authHeader = headers.authorization || "Not provided";
+    console.log(`[Upload API] Auth header: ${authHeader.substring(0, 20)}...`);
+    
     // Dapatkan user dari token
     const user = await getUserFromToken(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      console.error("[Upload API] Authentication failed - No valid user found from token");
+      return NextResponse.json({ 
+        error: "Unauthorized - Sesi login tidak valid atau telah berakhir" 
+      }, { status: 401 });
     }
+    
+    console.log(`[Upload API] Authenticated user: ${user.name} (${user.email})`);
 
     // Parse form data dengan file
     const formData = await request.formData();
     const file = formData.get("file");
     const title = formData.get("title");
+    
+    console.log(`[Upload API] File received: ${file ? file.name : 'No file'}, size: ${file ? file.size : 0} bytes, title: ${title || 'No title'}`);
 
     // Validasi input
     if (!file || !title) {
@@ -87,21 +101,40 @@ export async function POST(request) {
         verified: false,
         userId: user.id,
       },
-    });
-
+    });    console.log(`[Upload API] Journal created successfully with ID: ${journal.id}`);
+    
     return NextResponse.json(
       {
         message: "Dokumen berhasil diunggah dan dikonversi menjadi jurnal",
         id: journal.id,
         title: journal.title,
+        createdAt: journal.createdAt
       },
       { status: 201 }
     );
   } catch (error) {
     console.error("Upload document error:", error);
+    
+    // Memberikan pesan error yang lebih spesifik
+    let errorMessage = "Terjadi kesalahan saat mengunggah dokumen";
+    let statusCode = 500;
+    
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      errorMessage = "Token autentikasi tidak valid atau telah kedaluwarsa";
+      statusCode = 401;
+    } else if (error.code === 'P2002') { 
+      errorMessage = "Dokumen dengan judul tersebut sudah ada";
+      statusCode = 409;
+    } else if (error.message.includes("Unauthorized")) {
+      errorMessage = "Sesi login Anda telah berakhir, silakan login kembali";
+      statusCode = 401;
+    }
+    
+    console.error(`[Upload API] Error: ${errorMessage} (${statusCode})`);
+    
     return NextResponse.json(
-      { error: "Terjadi kesalahan saat mengunggah dokumen" },
-      { status: 500 }
+      { error: errorMessage },
+      { status: statusCode }
     );
   }
 }

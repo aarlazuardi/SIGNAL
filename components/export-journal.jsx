@@ -106,16 +106,16 @@ export default function ExportJournal() {
   const fetchJournals = async () => {
     try {
       setLoading(true);
-      
+
       // Import fungsi yang lebih robust
       const { fetchWithAuth } = await import("@/lib/api");
-      
+
       // Gunakan fetchWithAuth untuk handle token dan retry
       const response = await fetchWithAuth(
         "/api/journal/mine",
         { method: "GET" },
-        true,  // tunggu token
-        2      // retry 2x
+        true, // tunggu token
+        2 // retry 2x
       );
 
       if (!response.ok) {
@@ -213,8 +213,7 @@ export default function ExportJournal() {
         variant: "default",
       });
     }
-  };
-  const handleUpload = async () => {
+  };  const handleUpload = async () => {
     if (!selectedFile) {
       toast({
         title: "File tidak ditemukan",
@@ -229,10 +228,10 @@ export default function ExportJournal() {
 
     try {
       // Import fungsi helper
-      const { waitForAuthToken } = await import("@/lib/api");
+      const { waitForAuthToken, fetchWithAuth, getAuthToken } = await import("@/lib/api");
 
-      // Tunggu token tersedia (maksimal 10 detik)
-      const token = await waitForAuthToken(10000);
+      // Tunggu token tersedia dengan waktu lebih lama (maksimal 15 detik)
+      const token = await waitForAuthToken(15000, 300);  // 300ms interval polling
 
       if (!token) {
         toast({
@@ -246,6 +245,8 @@ export default function ExportJournal() {
         }, 1500);
         return;
       }
+      
+      console.log(`[Upload] Token ditemukan, panjang: ${token.length}, awal: ${token.substring(0, 10)}...`);
 
       // Validasi hanya file PDF
       if (
@@ -264,37 +265,64 @@ export default function ExportJournal() {
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("title", selectedFile.name.replace(/\.[^/.]+$/, ""));
+
+      // Ambil token terbaru sebelum request
+      const freshToken = getAuthToken();
+      console.log(`[Upload] Menggunakan token saat ini: ${freshToken ? 'tersedia' : 'tidak tersedia'}`);
       
-      // Import fungsi fetchWithAuth yang lebih robust
-      const { fetchWithAuth } = await import("@/lib/api");
+      // Buat headers untuk FormData secara manual dengan token yang ada
+      const headers = {};
+      if (freshToken) {
+        headers["Authorization"] = `Bearer ${freshToken}`;
+      }
       
-      // Kirim ke endpoint upload dengan fetchWithAuth yang lebih robust
-      // Catatan: Untuk FormData, jangan sertakan Content-Type di headers
+      console.log("[Upload] Mengirim request ke /api/journal/upload");
+      
+      // Kirim ke endpoint upload dengan cara yang lebih robust
       const response = await fetchWithAuth(
         "/api/journal/upload",
         {
           method: "POST",
-          headers: {
-            // Jangan sertakan Content-Type untuk FormData
-          },
+          headers: headers, // Gunakan headers dengan Authorization yang sudah disiapkan
           body: formData,
         },
-        true,  // tunggu token
-        2      // retry 2x
-      );
+        true, // tunggu token
+        3 // retry 3x untuk menangani kasus edge
+      );      console.log(`[Upload] Response status: ${response.status}`);
+      
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[Upload] Error response: ${errorText}`);
         let errorMsg = "Gagal mengunggah jurnal.";
         try {
-          const errorData = JSON.parse(errorText);
-          errorMsg = errorData.error || errorMsg;
-        } catch {}
+          // Hanya parse jika isinya sepertinya JSON
+          if (errorText && errorText.trim().startsWith("{")) {
+            const errorData = JSON.parse(errorText);
+            errorMsg = errorData.error || errorMsg;
+            
+            // Tambahkan instruksi pemulihan untuk error autentikasi
+            if (errorMsg.includes("Unauthorized") || response.status === 401) {
+              errorMsg += ". Sesi mungkin telah berakhir. Mencoba login ulang...";
+              // Redirect ke login setelah error 401
+              setTimeout(() => {
+                window.location.href = "/login";
+              }, 2000);
+            }
+          }
+        } catch (e) {
+          console.error("[Upload] Error parsing response:", e);
+        }
         throw new Error(errorMsg);
       }
+      
+      console.log("[Upload] Response OK, memproses data");
       const data = await response.json();
+      console.log("[Upload] Data response:", data);
+      
       if (!data || !data.id) {
         throw new Error("Data respons dari server tidak lengkap");
       }
+      
       // Update UI
       const newJournal = {
         id: data.id,
@@ -304,6 +332,7 @@ export default function ExportJournal() {
           .toISOString()
           .split("T")[0],
       };
+      
       setJournals([newJournal, ...journals]);
       setSelectedFile(null);
       setShowUploadDialog(false);
@@ -312,6 +341,8 @@ export default function ExportJournal() {
         description: "Jurnal berhasil diunggah ke database.",
         variant: "success",
       });
+      
+      // Refresh daftar jurnal untuk memastikan data terbaru
       await fetchJournals();
     } catch (error) {
       console.error("Error during upload:", error);
@@ -364,16 +395,16 @@ export default function ExportJournal() {
 
       // Generate signature using the provided private key
       const { sign } = await import("@/lib/crypto/client-ecdsa");
-      
+
       // Import fungsi fetchWithAuth yang lebih robust
       const { fetchWithAuth } = await import("@/lib/api");
 
       // Fetch journal content to sign dengan fetchWithAuth yang lebih robust
       const journalResponse = await fetchWithAuth(
-        `/api/journal/${selectedJournal.id}`, 
+        `/api/journal/${selectedJournal.id}`,
         { method: "GET" },
-        true,  // tunggu token tersedia
-        2      // retry max 2x jika error 401
+        true, // tunggu token tersedia
+        2 // retry max 2x jika error 401
       );
 
       if (!journalResponse.ok) {
@@ -410,8 +441,8 @@ export default function ExportJournal() {
             metadata: signatureMetadata,
           }),
         },
-        true,  // tunggu token tersedia
-        2      // retry max 2x jika error 401
+        true, // tunggu token tersedia
+        2 // retry max 2x jika error 401
       );
 
       if (!updateResponse.ok) {
