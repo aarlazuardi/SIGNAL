@@ -74,33 +74,65 @@ export function AuthProvider({ children }) {
   // Pastikan customToken dari session NextAuth selalu disimpan ke localStorage, dengan polling jika perlu
   useEffect(() => {
     let pollingInterval;
+    let pollingCounter = 0;
+    const MAX_POLLS = 50; // 50 x 200ms = 10 detik total polling
+
     if (status === "authenticated" && session?.customToken) {
+      // Coba simpan token dengan berbagai metode (redundant untuk keamanan)
+
+      // Metode 1: Gunakan setAuthToken dari api.js
       const currentToken = getAuthToken();
       if (currentToken !== session.customToken) {
         setAuthToken(session.customToken);
-        if (process.env.NODE_ENV === "development") {
-          console.log(
-            "[AuthProvider] customToken ditulis ke localStorage (langsung)"
-          );
-        }
+        console.log(
+          "[AuthProvider] customToken ditulis ke localStorage (metode 1)"
+        );
       }
+
+      // Metode 2: Tulis langsung ke localStorage untuk keamanan tambahan
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("signal_auth_token", session.customToken);
+        console.log(
+          "[AuthProvider] customToken ditulis ke localStorage (metode 2 langsung)"
+        );
+      }
+
       // Polling untuk memastikan token benar-benar tersimpan (mengatasi race condition/hydration)
       pollingInterval = setInterval(() => {
+        pollingCounter++;
         const tokenNow = getAuthToken();
+
         if (tokenNow !== session.customToken) {
+          // Coba lagi kedua metode
           setAuthToken(session.customToken);
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              "[AuthProvider] customToken ditulis ke localStorage (polling)"
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(
+              "signal_auth_token",
+              session.customToken
             );
           }
+          console.log(
+            `[AuthProvider] customToken ditulis ke localStorage (polling #${pollingCounter})`
+          );
         } else {
+          console.log(
+            `[AuthProvider] customToken berhasil tersimpan di localStorage setelah ${pollingCounter} kali polling`
+          );
           clearInterval(pollingInterval);
         }
-      }, 200); // polling setiap 200ms, stop jika sudah sama
-      // Stop polling setelah 2 detik untuk mencegah infinite loop
-      setTimeout(() => clearInterval(pollingInterval), 2000);
+
+        // Hentikan polling jika sudah mencapai batas
+        if (pollingCounter >= MAX_POLLS) {
+          console.log(
+            `[AuthProvider] Batas polling tercapai (${MAX_POLLS}). Status token: ${
+              getAuthToken() === session.customToken ? "berhasil" : "gagal"
+            }`
+          );
+          clearInterval(pollingInterval);
+        }
+      }, 200);
     }
+
     return () => {
       if (pollingInterval) clearInterval(pollingInterval);
     };

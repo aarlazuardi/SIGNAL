@@ -232,20 +232,29 @@ export default function ExportJournal() {
       });
       return;
     }
+
     setIsUploading(true);
-    const token = localStorage.getItem("signal_auth_token");
-    if (!token) {
-      toast({
-        title: "Autentikasi diperlukan",
-        description: "Anda perlu login untuk mengunggah jurnal.",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 1500);
-      return;
-    }
+
     try {
+      // Import fungsi helper
+      const { waitForAuthToken } = await import("@/lib/api");
+
+      // Tunggu token tersedia (maksimal 10 detik)
+      const token = await waitForAuthToken(10000);
+
+      if (!token) {
+        toast({
+          title: "Autentikasi gagal",
+          description:
+            "Tidak dapat menemukan token autentikasi. Silakan login ulang.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
+        return;
+      }
+
       // Validasi hanya file PDF
       if (
         selectedFile.type !== "application/pdf" &&

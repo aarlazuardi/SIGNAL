@@ -156,10 +156,25 @@ export default function CreateJournal() {
     if (!title || !content) return;
     setIsSaving(true);
     try {
+      // Import fungsi helper untuk menunggu token tersedia
+      const { waitForAuthToken } = await import("@/lib/api");
+
+      // Tunggu token tersedia dengan polling (max 10 detik)
+      const token = await waitForAuthToken(10000);
+
+      if (!token) {
+        throw new Error(
+          "Tidak dapat menemukan token autentikasi. Silakan login ulang."
+        );
+      }
+
       // Simpan draft dulu, dapatkan ID
       const response = await fetch("/api/journal/create", {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           title,
           content,
