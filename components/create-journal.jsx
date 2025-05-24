@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -32,9 +32,31 @@ export default function CreateJournal() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingSignJournalId, setPendingSignJournalId] = useState(null);
+  const [tokenReady, setTokenReady] = useState(false);
+  const [loadingToken, setLoadingToken] = useState(true);
   const { user } = useAuth();
   const router = useRouter();
   const { addToast: toast } = useToast();
+
+  useEffect(() => {
+    let interval;
+    function checkToken() {
+      const token = localStorage.getItem("signal_auth_token");
+      if (token) {
+        setTokenReady(true);
+        setLoadingToken(false);
+        if (interval) clearInterval(interval);
+      } else {
+        setTokenReady(false);
+        setLoadingToken(true);
+      }
+    }
+    checkToken();
+    if (!tokenReady) {
+      interval = setInterval(checkToken, 200);
+    }
+    return () => interval && clearInterval(interval);
+  }, []);
 
   const handleSave = async () => {
     if (!title || !content) return;
@@ -203,6 +225,17 @@ export default function CreateJournal() {
       });
     }
   };
+
+  if (loadingToken) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg text-muted-foreground">
+          Memuat sesi autentikasi...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container max-w-4xl py-8">
       <div className="mb-8">

@@ -64,6 +64,13 @@ export function AuthProvider({ children }) {
     fetchUser();
   }, [session?.customToken, status]);
 
+  // Pastikan customToken dari session NextAuth selalu disimpan ke localStorage
+  useEffect(() => {
+    if (status === "authenticated" && session?.customToken) {
+      setAuthToken(session.customToken);
+    }
+  }, [session?.customToken, status]);
+
   const login = async (email, password) => {
     try {
       const response = await loginUser({ email, password });
