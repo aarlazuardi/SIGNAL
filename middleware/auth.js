@@ -108,52 +108,78 @@ export async function auth(request) {
  */
 export async function getUserFromToken(request) {
   try {
-    // Periksa header Authorization
+    // Periksa header Authorization - validasi cepat
     const authHeader = request.headers.get("authorization");
 
-    // Log untuk debugging
-    console.log(`[Auth Helper] Authorization header: ${authHeader ? "Present" : "Missing"}`);
-    
     // Jika header tidak ada atau tidak dimulai dengan 'Bearer '
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("[Auth Helper] Missing or invalid Authorization header format");
       return null;
     }
 
     // Ambil token dari header
     const token = authHeader.split(" ")[1];
-    
-    if (!token || token === "undefined" || token === "null") {
-      console.log("[Auth Helper] Token is empty, undefined, or null");
+
+    // Validasi format token dasar untuk gagal cepat
+    if (
+      !token ||
+      token === "undefined" ||
+      token === "null" ||
+      token.split(".").length !== 3
+    ) {
       return null;
     }
-    
-    console.log(`[Auth Helper] Found token, length: ${token.length}, starts with: ${token.substring(0, 10)}...`);
 
-    // Verifikasi token
+    // Implementasi cache sederhana untuk token sebelumnya
+    // Menggunakan Map untuk menyimpan hasil dekode token dengan waktu kadaluarsa
+    // Cache global hanya tersedia selama proses server berjalan
+    if (!global.tokenCache) {
+      global.tokenCache = new Map();
+    }
+
+    const now = Date.now();
+    // Cek apakah token sudah ada di cache dan masih valid (cache 30 detik)
+    if (global.tokenCache.has(token)) {
+      const cachedData = global.tokenCache.get(token);
+      // Token cache valid selama 30 detik
+      if (now - cachedData.timestamp < 30000) {
+        return cachedData.user;
+      }
+      // Token cache kadaluarsa, hapus dari cache
+      global.tokenCache.delete(token);
+    }
+
+    // Verifikasi token tanpa logging berlebihan untuk mengurangi overhead
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log(`[Auth Helper] Token verified successfully for user: ${decoded.userId}`);
     } catch (jwtError) {
-      console.error(`[Auth Helper] Token verification failed:`, jwtError.message);
       return null;
     }
 
-    // Periksa apakah user masih ada di database
+    // Periksa apakah user masih ada di database dengan select yang lebih efisien
+    // Hanya select field yang penting untuk mempercepat kueri
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        publicKey: true,
+        role: true,
+      },
     });
-    
-    if (!user) {
-      console.log(`[Auth Helper] User with id ${decoded.userId} not found in database`);
-    } else {
-      console.log(`[Auth Helper] User found: ${user.name} (${user.email})`);
+
+    // Cache hasil untuk 30 detik ke depan
+    if (user) {
+      global.tokenCache.set(token, {
+        user,
+        timestamp: now,
+      });
     }
 
     return user || null;
   } catch (error) {
-    console.error("[Auth Helper] getUserFromToken error:", error);
+    console.error("getUserFromToken error:", error);
     return null;
   }
 }

@@ -188,32 +188,61 @@ export default function ExportJournal() {
       fetchJournals();
     }
   }, [user, tokenReady]);
+  // Tambahkan fungsi helper untuk validasi file yang lebih cepat
+  const validateFile = (file) => {
+    // Validasi tipe file
+    if (
+      file.type !== "application/pdf" &&
+      !file.name.toLowerCase().endsWith(".pdf")
+    ) {
+      toast({
+        title: "Format file tidak didukung",
+        description: "Hanya file PDF yang dapat diupload.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    // Validasi ukuran file - maks 5MB
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_SIZE) {
+      toast({
+        title: "Ukuran file terlalu besar",
+        description: "File PDF maksimal 5MB untuk kinerja optimal.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  // Format file size untuk tampilan
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  };
+
+  // Handler file change yang lebih efisien dengan feedback ukuran file
   const handleFileChange = (e) => {
     const file = e.target.files && e.target.files[0];
-    if (file) {
-      if (
-        file.type !== "application/pdf" &&
-        !file.name.toLowerCase().endsWith(".pdf")
-      ) {
-        toast({
-          title: "Format file tidak didukung",
-          description: "Hanya file PDF yang dapat diupload.",
-          variant: "destructive",
-        });
-        e.target.value = "";
-        setSelectedFile(null);
-        return;
-      }
+    if (!file) return;
 
-      // Set the selected file and show a notification
+    // Validasi file sebelum disimpan ke state
+    if (validateFile(file)) {
       setSelectedFile(file);
+      // Feedback cepat untuk pengguna dengan format ukuran yang lebih baik
       toast({
-        title: "File dipilih",
-        description: `${file.name} siap untuk diunggah.`,
-        variant: "default",
+        title: "File siap diupload",
+        description: `${file.name} (${formatFileSize(file.size)})`,
       });
+    } else {
+      e.target.value = ""; // Clear input field
+      setSelectedFile(null);
     }
-  };  const handleUpload = async () => {
+  };
+  const handleUpload = async () => {
     if (!selectedFile) {
       toast({
         title: "File tidak ditemukan",
@@ -226,104 +255,173 @@ export default function ExportJournal() {
 
     setIsUploading(true);
 
+    // Tampilkan feedback untuk pengalaman lebih baik
+    toast({
+      title: "Mempersiapkan upload",
+      description: "Memeriksa file dan autentikasi...",
+    });
+
     try {
-      // Import fungsi helper
-      const { waitForAuthToken, fetchWithAuth, getAuthToken } = await import("@/lib/api");
-
-      // Tunggu token tersedia dengan waktu lebih lama (maksimal 15 detik)
-      const token = await waitForAuthToken(15000, 300);  // 300ms interval polling
-
-      if (!token) {
-        toast({
-          title: "Autentikasi gagal",
-          description:
-            "Tidak dapat menemukan token autentikasi. Silakan login ulang.",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 1500);
+      // Validasi file dengan fungsi helper untuk lebih efisien
+      if (!validateFile(selectedFile)) {
+        setIsUploading(false);
         return;
       }
-      
-      console.log(`[Upload] Token ditemukan, panjang: ${token.length}, awal: ${token.substring(0, 10)}...`);
 
-      // Validasi hanya file PDF
-      if (
-        selectedFile.type !== "application/pdf" &&
-        !selectedFile.name.toLowerCase().endsWith(".pdf")
-      ) {
+      // Pembatasan ukuran lebih ketat
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+      if (selectedFile.size > MAX_SIZE) {
         toast({
-          title: "Format file tidak didukung",
-          description: "Hanya file PDF yang dapat diupload.",
+          title: "File terlalu besar",
+          description:
+            "Ukuran file maksimal adalah 5MB. Silakan kompres file Anda.",
           variant: "destructive",
         });
         setIsUploading(false);
         return;
       }
-      // Siapkan FormData
+
+      toast({
+        title: "Mengupload jurnal",
+        description: `Mengunggah file ${selectedFile.name} (${(
+          selectedFile.size / 1024
+        ).toFixed(1)} KB)...`,
+      });
+
+      // Coba dapatkan token dengan lebih agresif dari berbagai sumber
+      let token = null;
+
+      // Import fungsi untuk dapat token
+      const { waitForAuthToken } = await import("@/lib/api");
+
+      // Tunggu token dengan timeout yang lebih pendek (3 detik)
+      token = await waitForAuthToken(3000, 50);
+
+      // Jika masih tidak ada token, coba refresh browser storage
+      if (!token && typeof window !== "undefined") {
+        // Coba refresh token dari session storage
+        token = sessionStorage.getItem("signal_auth_token");
+
+        // Coba dari cookies
+        if (!token && document.cookie) {
+          const match = document.cookie.match(/signal_auth_token=([^;]+)/);
+          if (match) token = match[1];
+        }
+
+        // Coba dari localStorage lagi (mungkin baru saja diset oleh komponen lain)
+        if (!token) {
+          token = localStorage.getItem("signal_auth_token");
+        }
+      }
+
+      // Jika masih tidak ada token, coba dari context auth
+      if (!token && user) {
+        // Minta auth provider untuk update data user (refreshing token)
+        await updateUserData();
+        token =
+          localStorage.getItem("signal_auth_token") ||
+          sessionStorage.getItem("signal_auth_token");
+      }
+
+      // Jika tidak ada token, redirect ke login dengan pesan yang jelas
+      if (!token) {
+        toast({
+          title: "Sesi Berakhir",
+          description:
+            "Autentikasi tidak valid atau sesi telah berakhir. Anda akan dialihkan ke halaman login.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href =
+            "/login?redirect=" +
+            encodeURIComponent(window.location.pathname) +
+            "&reason=token_expired";
+        }, 1500);
+        return;
+      }
+
+      // Gunakan FormData untuk upload file dengan lebih efisien
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("title", selectedFile.name.replace(/\.[^/.]+$/, ""));
 
-      // Ambil token terbaru sebelum request
-      const freshToken = getAuthToken();
-      console.log(`[Upload] Menggunakan token saat ini: ${freshToken ? 'tersedia' : 'tidak tersedia'}`);
-      
-      // Buat headers untuk FormData secara manual dengan token yang ada
-      const headers = {};
-      if (freshToken) {
-        headers["Authorization"] = `Bearer ${freshToken}`;
-      }
-      
-      console.log("[Upload] Mengirim request ke /api/journal/upload");
-      
-      // Kirim ke endpoint upload dengan cara yang lebih robust
-      const response = await fetchWithAuth(
-        "/api/journal/upload",
-        {
-          method: "POST",
-          headers: headers, // Gunakan headers dengan Authorization yang sudah disiapkan
-          body: formData,
+      // Tambahkan indikator untuk membantu server mengetahui sumber login
+      formData.append(
+        "authSource",
+        sessionStorage.getItem("auth_method") || "direct"
+      );
+
+      // Upload dengan AbortController untuk timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 detik timeout untuk file besar
+
+      // Upload langsung dengan fetch sederhana tapi dengan headers yang benar
+      const response = await fetch("/api/journal/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-        true, // tunggu token
-        3 // retry 3x untuk menangani kasus edge
-      );      console.log(`[Upload] Response status: ${response.status}`);
-      
+        body: formData,
+        signal: controller.signal,
+      });
+
+      // Clear timeout setelah response
+      clearTimeout(timeoutId);
+
+      // Handle spesifik untuk error autentikasi
+      if (response.status === 401) {
+        // Simpan halaman saat ini untuk redirect kembali setelah login
+        sessionStorage.setItem(
+          "redirect_after_login",
+          window.location.pathname
+        );
+
+        toast({
+          title: "Sesi Login Berakhir",
+          description: "Sesi autentikasi telah berakhir. Silakan login ulang.",
+          variant: "destructive",
+        });
+
+        // Hapus token yang bermasalah
+        localStorage.removeItem("signal_auth_token");
+        sessionStorage.removeItem("signal_auth_token");
+
+        // Arahkan ke login dengan parameter untuk redirect kembali
+        setTimeout(() => {
+          window.location.href =
+            "/login?redirect=" +
+            encodeURIComponent(window.location.pathname) +
+            "&reason=session_expired";
+        }, 1500);
+        return;
+      }
+
+      // Handle error umum lainnya
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[Upload] Error response: ${errorText}`);
+
         let errorMsg = "Gagal mengunggah jurnal.";
         try {
-          // Hanya parse jika isinya sepertinya JSON
           if (errorText && errorText.trim().startsWith("{")) {
             const errorData = JSON.parse(errorText);
             errorMsg = errorData.error || errorMsg;
-            
-            // Tambahkan instruksi pemulihan untuk error autentikasi
-            if (errorMsg.includes("Unauthorized") || response.status === 401) {
-              errorMsg += ". Sesi mungkin telah berakhir. Mencoba login ulang...";
-              // Redirect ke login setelah error 401
-              setTimeout(() => {
-                window.location.href = "/login";
-              }, 2000);
-            }
           }
         } catch (e) {
           console.error("[Upload] Error parsing response:", e);
         }
+
         throw new Error(errorMsg);
       }
-      
+
       console.log("[Upload] Response OK, memproses data");
       const data = await response.json();
-      console.log("[Upload] Data response:", data);
-      
+
       if (!data || !data.id) {
         throw new Error("Data respons dari server tidak lengkap");
       }
-      
-      // Update UI
+
+      // Update UI dengan hasil upload
       const newJournal = {
         id: data.id,
         title: data.title,
@@ -332,21 +430,42 @@ export default function ExportJournal() {
           .toISOString()
           .split("T")[0],
       };
-      
-      setJournals([newJournal, ...journals]);
+
+      // Tambahkan jurnal baru ke awal list
+      setJournals((prevJournals) => [newJournal, ...prevJournals]);
       setSelectedFile(null);
       setShowUploadDialog(false);
+
+      // Tampilkan notifikasi sukses
       toast({
         title: "Sukses",
         description: "Jurnal berhasil diunggah ke database.",
         variant: "success",
       });
-      
-      // Refresh daftar jurnal untuk memastikan data terbaru
-      await fetchJournals();
+
+      // Refresh daftar jurnal untuk memastikan data terbaru dengan delay
+      // untuk mengurangi beban server
+      setTimeout(() => {
+        fetchJournals();
+      }, 1000);
     } catch (error) {
       console.error("Error during upload:", error);
-      toast(error.message || "Terjadi kesalahan saat mengunggah jurnal.");
+
+      // Pesan error yang lebih informatif
+      let errorMessage =
+        error.message || "Terjadi kesalahan saat mengunggah jurnal";
+
+      // Deteksi error timeout
+      if (error.name === "AbortError") {
+        errorMessage =
+          "Upload timeout - koneksi terlalu lambat atau file terlalu besar";
+      }
+
+      toast({
+        title: "Gagal Upload",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setIsUploading(false);
     }
@@ -874,16 +993,36 @@ export default function ExportJournal() {
                   onChange={handleFileChange}
                   className="flex-1"
                 />
-              </div>
+              </div>{" "}
               {selectedFile && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <FileText className="h-4 w-4 text-emerald-600" />
-                  File dipilih:{" "}
-                  <span className="font-medium">{selectedFile.name}</span>
-                </p>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <FileText className="h-4 w-4 text-emerald-600" />
+                    File dipilih:{" "}
+                    <span className="font-medium">{selectedFile.name}</span>
+                  </p>
+                  <p className="text-xs flex items-center">
+                    <span
+                      className={`${
+                        selectedFile.size > 4 * 1024 * 1024
+                          ? "text-amber-500"
+                          : "text-emerald-600"
+                      }`}
+                    >
+                      Ukuran: {(selectedFile.size / (1024 * 1024)).toFixed(2)}{" "}
+                      MB
+                    </span>
+                    {selectedFile.size > 4 * 1024 * 1024 && (
+                      <AlertCircle className="h-3 w-3 text-amber-500 ml-1" />
+                    )}
+                  </p>
+                </div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">
-                Hanya file PDF yang didukung. Ukuran maksimal: 5MB
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <span>Hanya file PDF yang didukung. Ukuran maksimal: 5MB</span>
+              </p>
+              <p className="text-xs text-blue-500">
+                (Disarankan kurang dari 2MB untuk performa terbaik)
               </p>
             </div>
           </div>{" "}
@@ -893,19 +1032,26 @@ export default function ExportJournal() {
               onClick={() => setShowUploadDialog(false)}
             >
               Batal
-            </Button>
+            </Button>{" "}
             <Button
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className={`${
+                isUploading
+                  ? "bg-blue-500"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
               onClick={handleUpload}
               disabled={!selectedFile || isUploading}
             >
               {isUploading ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Mengunggah...
+                  <span className="upload-progress">Mengupload...</span>
                 </span>
               ) : (
-                "Upload"
+                <>
+                  <Upload className="mr-1 h-4 w-4" />
+                  <span>Upload</span>
+                </>
               )}
             </Button>
           </DialogFooter>
