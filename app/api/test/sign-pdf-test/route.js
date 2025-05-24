@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { signPdf } from "../journal/sign/pdf-signer.js";
+import { signPdf } from "@/app/api/journal/sign/pdf-signer.js";
 
 export async function GET(request) {
   try {
